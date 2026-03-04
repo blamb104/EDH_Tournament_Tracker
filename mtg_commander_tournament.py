@@ -183,9 +183,6 @@ with st.sidebar:
                 st.text(f"• {p}")
             
         st.divider()
-    if st.button("Reset Tournament", type="secondary"):
-        st.session_state.players, st.session_state.history, st.session_state.current_round, st.session_state.current_pods = [], [], 0, []
-        st.rerun()
 
 # --- MAIN UI ---
 tab1, tab2, tab3 = st.tabs(["📊 Standings", "⚔️ Active Pods", "📜 History"])
@@ -286,6 +283,7 @@ with tab3:
                         st.write(f"Winner: **{pod['winner']}**")
                     else:
                         st.write(f"Ranks: {pod['ranks']}")
+
 
 
 
