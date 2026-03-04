@@ -209,7 +209,7 @@ with tab1:
 
 with tab2:
     if st.session_state.current_round == 0:
-        if st.button("🚀 Start Round 1", type="primary"):
+        if st.button("Start Round 1", type="primary"):
             generate_commander_pods()
             st.rerun()
             
@@ -220,7 +220,11 @@ with tab2:
         all_pods_filled = True  # Logic gate for the Submit button
         
         for i, pod in enumerate(st.session_state.current_pods):
-            with st.expander(f"Pod {i+1} ({len(pod)} players)", expanded=True):
+            # Create a string of player names, e.g., "Alice, Bob, Charlie"
+            player_names = ", ".join(pod)
+            
+            # Make the headers to show pod members.
+            with st.expander(f"Pod {i+1}: {player_names}", expanded=True):
                 if st.session_state.mode == "Casual":
                     win = st.selectbox("Winner?", ["Select..."] + pod, key=f"w_{i}")
                     if win == "Select...":
