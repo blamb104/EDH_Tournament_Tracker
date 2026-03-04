@@ -127,7 +127,7 @@ def add_player_callback():
 
 # --- SIDEBAR ---
 with st.sidebar:
-    st.title("🛡️ EDH Tournament")
+    st.header("Tournament Setup/Overview")
     st.session_state.mode = st.radio("Tournament Mode", ["Casual", "Competitive"])
     # --- INFO DROPDOWN ---
     with st.expander("Scoring Rules"):
@@ -178,16 +178,16 @@ with st.sidebar:
         # This shows once Round 1 is generated
         st.success(f"🏆 Tournament in Progress (Round {st.session_state.current_round})")
         # You might still want to see the players, so we can keep the expander here too
-        with st.expander("View Registered Players"):
-            for p in st.session_state.players:
-                st.text(f"• {p}")
-            
-        st.divider()
-    if st.button("Reset Tournament", type="secondary"):
-        st.session_state.players, st.session_state.history, st.session_state.current_round, st.session_state.current_pods = [], [], 0, []
-        st.rerun()
+            with st.expander("View/Remove Players"):
+                for p in st.session_state.players:
+                    cols = st.columns([4, 1])
+                    cols[0].write(p)
+                    if cols[1].button("❌", key=f"del_{p}"):
+                        st.session_state.players.remove(p)
+                        st.rerun()
 
 # --- MAIN UI ---
+st.title("🛡️ EDH Tournament")
 tab1, tab2, tab3 = st.tabs(["📊 Standings", "⚔️ Active Pods", "📜 History"])
 
 with tab1:
@@ -348,6 +348,7 @@ with tab3:
 
     else:
         st.info("No history available yet.")
+
 
 
 
