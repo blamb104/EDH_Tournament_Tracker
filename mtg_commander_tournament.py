@@ -183,6 +183,9 @@ with st.sidebar:
                 st.text(f"• {p}")
             
         st.divider()
+    if st.button("Reset Tournament", type="secondary"):
+        st.session_state.players, st.session_state.history, st.session_state.current_round, st.session_state.current_pods = [], [], 0, []
+        st.rerun()
 
 # --- MAIN UI ---
 tab1, tab2, tab3 = st.tabs(["📊 Standings", "⚔️ Active Pods", "📜 History"])
@@ -274,15 +277,15 @@ with tab2:
 with tab3:
     st.header("📜 History")
     if st.session_state.history:
-        # Reversing history so the most recent round is at the top
-        for idx, rnd in enumerate(reversed(st.session_state.history)):
-            round_num = len(st.session_state.history) - idx
+        # Loop forward through history (Round 1, then Round 2, etc.)
+        for idx, rnd in enumerate(st.session_state.history):
+            round_num = idx + 1
             with st.expander(f"Round {round_num}"):
                 for pod_idx, pod in enumerate(rnd):
                     st.markdown(f"**Pod {pod_idx + 1}**")
                     
                     if pod.get('type') == 'Casual':
-                        # Sort: Winner first, then alphabetically for others
+                        # Sort: Winner first
                         sorted_players = sorted(
                             pod['players'], 
                             key=lambda p: (p != pod['winner'], p)
@@ -293,9 +296,8 @@ with tab3:
                             st.write(f"{icon} {p}: {pts} pts")
                     
                     else:
-                        # Sort by Rank (1st, 2nd, 3rd, 4th)
+                        # Sort: 1st Place first
                         pts_map = {1: 5, 2: 3, 3: 2, 4: 1}
-                        # Sort the ranks dictionary items by the rank value (the second element in the tuple)
                         sorted_ranks = sorted(pod['ranks'].items(), key=lambda item: item[1])
                         
                         for p, rank in sorted_ranks:
@@ -304,12 +306,11 @@ with tab3:
                             st.write(f"{icon} {p}: {pts} pts (Rank: {rank})")
                     
                     st.divider()
-    else:
-        st.info("No history available yet.")
-# --- CSV EXPORT LOGIC ---
-    if st.session_state.history:
-        st.divider()
-        st.subheader("💾 Export Data")
+        
+        # --- CSV EXPORT LOGIC ---
+        if st.session_state.history:
+            st.divider()
+            st.subheader("💾 Export Data")
         
         flat_history = []
         for round_idx, rnd in enumerate(st.session_state.history):
@@ -344,6 +345,9 @@ with tab3:
             mime='text/csv',
             use_container_width=True
         )
+
+    else:
+        st.info("No history available yet.")
 
 
 
