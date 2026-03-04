@@ -210,7 +210,7 @@ with tab1:
 
 with tab2:
     if st.session_state.current_round == 0:
-        if st.button("🚀 Start Round 1", type="primary"):
+        if st.button("Start Round 1", type="primary"):
             generate_commander_pods(); st.rerun()
     elif st.session_state.current_pods:
         st.header(f"⚔️ Round {st.session_state.current_round}")
@@ -270,4 +270,5 @@ with tab3:
                         st.write(f"Winner: **{pod['winner']}**")
                     else:
                         st.write(f"Ranks: {pod['ranks']}")
+
 
