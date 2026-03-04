@@ -209,10 +209,25 @@ with tab1:
 
 with tab2:
     if st.session_state.current_round == 0:
-        if st.button("Start Round 1", type="primary"):
-            generate_commander_pods()
-            st.rerun()
+        # Check for minimum player count
+        num_players = len(st.session_state.players)
+        
+        if num_players < 6:
+            st.header("⚔️ Prepare for Battle")
+            st.warning(f"⚠️ **Minimum 6 players required.** (Current: {num_players})")
+            st.info("The pairing logic requires at least 6 players to properly distribute pods of 3 and 4.")
             
+            # Show a disabled button so they know where to click later
+            st.button("Start Round 1", type="primary", disabled=True, help="Add more players in the sidebar first!")
+        else:
+            # Requirements met - allow start
+            st.success(f"Ready to go! {num_players} players registered.")
+            if st.button("Start Round 1", type="primary"):
+                # A quick pop-up toast for flair
+                st.toast("Generating Pods...", icon="⚔️")
+                generate_commander_pods()
+                st.rerun()
+                
     elif st.session_state.current_pods:
         st.header(f"⚔️ Round {st.session_state.current_round}")
         
@@ -348,6 +363,7 @@ with tab3:
 
     else:
         st.info("No history available yet.")
+
 
 
 
