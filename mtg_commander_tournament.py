@@ -73,7 +73,6 @@ def generate_commander_pods():
     st.session_state.current_pods = best_pods
     st.session_state.current_round += 1
 
-
 def get_commander_standings():
     stats = {p: {'Points': 0, 'Wins': 0, 'Opponents': []} for p in st.session_state.players}
     
@@ -91,23 +90,31 @@ def get_commander_standings():
                         stats[p]['Points'] += 3
                         stats[p]['Wins'] += 1
                 else:
-                    # Competitive Points: 1st=5, 2nd=3, 3rd=2, 4th=1
                     rank = entry['ranks'].get(p, 4)
                     pts_map = {1: 5, 2: 3, 3: 2, 4: 1}
                     stats[p]['Points'] += pts_map.get(rank, 1)
                     if rank == 1:
                         stats[p]['Wins'] += 1
                 
+                # Track opponents for tiebreakers
                 others = [o for o in players_in_pod if o != p]
                 stats[p]['Opponents'].extend(others)
 
     leaderboard = []
     for p, s in stats.items():
+        # Strength of Schedule: Sum of all points opponents have earned
         omp = sum(stats[o]['Points'] for o in s['Opponents'] if o in stats)
-        leaderboard.append({'Player': p, 'Points': s['Points'], 'Wins': s['Wins'], 'OMP': omp})
+        leaderboard.append({
+            'Player': p, 
+            'Points': s['Points'], 
+            'Wins': s['Wins'], 
+            'OMP': omp
+        })
     
     df = pd.DataFrame(leaderboard)
-    return df.sort_values(by=['Points', 'Wins', 'OMP'], ascending=False) if not df.empty else df
+    if not df.empty:
+        return df.sort_values(by=['Points', 'Wins', 'OMP'], ascending=False)
+    return df
 
 # --- CALLBACK FOR RAPID ENTRY ---
 def add_player_callback():
@@ -122,6 +129,27 @@ def add_player_callback():
 with st.sidebar:
     st.title("🛡️ EDH Tournament")
     st.session_state.mode = st.radio("Tournament Mode", ["Casual", "Competitive"])
+    # --- INFO DROPDOWN ---
+    with st.expander("ℹ️ Scoring Rules"):
+        if st.session_state.mode == "Casual":
+            st.markdown("""
+            **Casual Scoring:**
+            - **Winner:** 4 Points
+            - **Participation:** 1 Point
+            *(Total 4 per winner)*
+            """)
+        else:
+            st.markdown("""
+            **Competitive Scoring:**
+            - **1st Place:** 5 Points
+            - **2nd Place:** 3 Points
+            - **3rd Place:** 2 Points
+            - **4th Place:** 1 Point
+            
+            **Table Kill:**
+            Winner gets 1st (5pts), 
+            all others get last (1pt).
+            """)
     st.divider()
     st.subheader("Registration")
         # Adding 'on_change' and 'key' makes hitting Enter work instantly
@@ -168,6 +196,15 @@ with tab1:
     df = get_commander_standings()
     if not df.empty:
         st.dataframe(df, use_container_width=True, hide_index=True)
+        # --- EXPORT TO CSV ---
+        csv = df.to_csv(index=False).encode('utf-8')
+        
+        st.download_button(
+            label="📥 Export Standings to CSV",
+            data=csv,
+            file_name=f"EDH_Standings.csv",
+            mime='text/csv',
+        )
     else:
         st.info("Add players and start a round!")
 
