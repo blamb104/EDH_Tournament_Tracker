@@ -178,7 +178,7 @@ with st.sidebar:
         # This shows once Round 1 is generated
         st.success(f"🏆 Tournament in Progress (Round {st.session_state.current_round})")
         # You might still want to see the players, so we can keep the expander here too
-            with st.expander("View/Remove Players"):
+        with st.expander("View/Remove Players"):
                 for p in st.session_state.players:
                     cols = st.columns([4, 1])
                     cols[0].write(p)
@@ -348,6 +348,7 @@ with tab3:
 
     else:
         st.info("No history available yet.")
+
 
 
 
