@@ -127,7 +127,7 @@ def add_player_callback():
 
 # --- SIDEBAR ---
 with st.sidebar:
-    st.header("Tournament Setup/Overview")
+    st.title("Tournament Setup")
     st.session_state.mode = st.radio("Tournament Mode", ["Casual", "Competitive"])
     # --- INFO DROPDOWN ---
     with st.expander("Scoring Rules"):
@@ -348,6 +348,7 @@ with tab3:
 
     else:
         st.info("No history available yet.")
+
 
 
 
