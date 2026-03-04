@@ -306,6 +306,44 @@ with tab3:
                     st.divider()
     else:
         st.info("No history available yet.")
+# --- CSV EXPORT LOGIC ---
+    if st.session_state.history:
+        st.divider()
+        st.subheader("📊 Export Data")
+        
+        flat_history = []
+        for round_idx, rnd in enumerate(st.session_state.history):
+            for pod_idx, pod in enumerate(rnd):
+                if pod.get('type') == 'Casual':
+                    for p in pod['players']:
+                        flat_history.append({
+                            "Round": round_idx + 1,
+                            "Pod": pod_idx + 1,
+                            "Player": p,
+                            "Result": "Winner" if p == pod['winner'] else "Participant",
+                            "Points": 4 if p == pod['winner'] else 1
+                        })
+                else:
+                    pts_map = {1: 5, 2: 3, 3: 2, 4: 1}
+                    for p, rank in pod['ranks'].items():
+                        flat_history.append({
+                            "Round": round_idx + 1,
+                            "Pod": pod_idx + 1,
+                            "Player": p,
+                            "Result": f"Rank {rank}",
+                            "Points": pts_map.get(rank, 1)
+                        })
+        
+        history_df = pd.DataFrame(flat_history)
+        csv_history = history_df.to_csv(index=False).encode('utf-8')
+
+        st.download_button(
+            label="📥 Download Full Match History (CSV)",
+            data=csv_history,
+            file_name=f"EDH_Tournament_History_Full.csv",
+            mime='text/csv',
+            use_container_width=True
+        )
 
 
 
