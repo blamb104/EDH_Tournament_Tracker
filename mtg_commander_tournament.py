@@ -135,8 +135,7 @@ with st.sidebar:
             st.markdown("""
             **Casual Scoring:**
             - **Winner:** 4 Points
-            - **Participation:** 1 Point
-            *(Total 4 per winner)*
+            - **Others:** 1 Point
             """)
         else:
             st.markdown("""
@@ -270,5 +269,6 @@ with tab3:
                         st.write(f"Winner: **{pod['winner']}**")
                     else:
                         st.write(f"Ranks: {pod['ranks']}")
+
 
 
