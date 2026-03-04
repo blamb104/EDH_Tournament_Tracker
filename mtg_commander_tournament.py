@@ -130,7 +130,7 @@ with st.sidebar:
     st.title("🛡️ EDH Tournament")
     st.session_state.mode = st.radio("Tournament Mode", ["Casual", "Competitive"])
     # --- INFO DROPDOWN ---
-    with st.expander("ℹ️ Scoring Rules"):
+    with st.expander("Scoring Rules"):
         if st.session_state.mode == "Casual":
             st.markdown("""
             **Casual Scoring:**
@@ -270,3 +270,4 @@ with tab3:
                         st.write(f"Winner: **{pod['winner']}**")
                     else:
                         st.write(f"Ranks: {pod['ranks']}")
+
