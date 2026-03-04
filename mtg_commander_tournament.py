@@ -309,7 +309,7 @@ with tab3:
 # --- CSV EXPORT LOGIC ---
     if st.session_state.history:
         st.divider()
-        st.subheader("Export Data")
+        st.subheader("💾 Export Data")
         
         flat_history = []
         for round_idx, rnd in enumerate(st.session_state.history):
@@ -344,6 +344,7 @@ with tab3:
             mime='text/csv',
             use_container_width=True
         )
+
 
 
 
