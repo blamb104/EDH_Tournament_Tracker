@@ -274,15 +274,30 @@ with tab2:
 with tab3:
     st.header("📜 History")
     if st.session_state.history:
-        if st.button("⚠️ Undo Last Round"):
-            st.session_state.history.pop(); st.session_state.current_round -= 1; st.rerun()
-        for idx, rnd in enumerate(st.session_state.history):
-            with st.expander(f"Round {idx+1}"):
-                for pod in rnd:
+        # Reversing history so the most recent round is at the top
+        for idx, rnd in enumerate(reversed(st.session_state.history)):
+            round_num = len(st.session_state.history) - idx
+            with st.expander(f"Round {round_num}"):
+                for pod_idx, pod in enumerate(rnd):
+                    st.markdown(f"**Pod {pod_idx + 1}**")
+                    
                     if pod.get('type') == 'Casual':
-                        st.write(f"Winner: **{pod['winner']}**")
+                        # Displaying Casual points (Winner 4, others 1)
+                        for p in pod['players']:
+                            pts = 4 if p == pod['winner'] else 1
+                            icon = "👑" if p == pod['winner'] else "⚔️"
+                            st.write(f"{icon} {p}: {pts} pts")
                     else:
-                        st.write(f"Ranks: {pod['ranks']}")
+                        # Displaying Competitive points (5/3/2/1)
+                        pts_map = {1: 5, 2: 3, 3: 2, 4: 1}
+                        for p, rank in pod['ranks'].items():
+                            pts = pts_map.get(rank, 1)
+                            icon = "🥇" if rank == 1 else "🥈" if rank == 2 else "🥉" if rank == 3 else "💀"
+                            st.write(f"{icon} {p}: {pts} pts (Rank: {rank})")
+                    st.divider()
+    else:
+        st.info("No history available yet.")
+
 
 
 
