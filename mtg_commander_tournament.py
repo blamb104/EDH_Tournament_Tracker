@@ -242,9 +242,16 @@ with tab2:
                         for j, p in enumerate(pod):
                             p_ranks[p] = cols[j].number_input(f"{p}", 1, 4, step=1, key=f"r_{p}_{i}")
                     
-                    # Point Preview QoL
+                    # --- QUALITY OF LIFE: POINT PREVIEW ---
                     pod_points = [pts_map.get(rank, 1) for rank in p_ranks.values()]
-                    st.caption(f"Points being awarded: {pod_points} (Total: {sum(pod_points)})")
+                    total_p = sum(pod_points)
+                    num_winners = list(p_ranks.values()).count(1)
+                    
+                    c1, c2 = st.columns([1, 1])
+                    c1.metric("Pod Total Points", f"{total_p} pts")
+                    
+                    if num_winners > 1:
+                        st.warning(f"⚠️ Note: {num_winners} players are marked as 1st Place.")
                     
                     results_to_submit.append({'players': pod, 'ranks': p_ranks, 'type': 'Competitive'})
 
@@ -275,6 +282,7 @@ with tab3:
                         st.write(f"Winner: **{pod['winner']}**")
                     else:
                         st.write(f"Ranks: {pod['ranks']}")
+
 
 
 
