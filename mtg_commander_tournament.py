@@ -282,21 +282,31 @@ with tab3:
                     st.markdown(f"**Pod {pod_idx + 1}**")
                     
                     if pod.get('type') == 'Casual':
-                        # Displaying Casual points (Winner 4, others 1)
-                        for p in pod['players']:
+                        # Sort: Winner first, then alphabetically for others
+                        sorted_players = sorted(
+                            pod['players'], 
+                            key=lambda p: (p != pod['winner'], p)
+                        )
+                        for p in sorted_players:
                             pts = 4 if p == pod['winner'] else 1
                             icon = "👑" if p == pod['winner'] else "⚔️"
                             st.write(f"{icon} {p}: {pts} pts")
+                    
                     else:
-                        # Displaying Competitive points (5/3/2/1)
+                        # Sort by Rank (1st, 2nd, 3rd, 4th)
                         pts_map = {1: 5, 2: 3, 3: 2, 4: 1}
-                        for p, rank in pod['ranks'].items():
+                        # Sort the ranks dictionary items by the rank value (the second element in the tuple)
+                        sorted_ranks = sorted(pod['ranks'].items(), key=lambda item: item[1])
+                        
+                        for p, rank in sorted_ranks:
                             pts = pts_map.get(rank, 1)
                             icon = "🥇" if rank == 1 else "🥈" if rank == 2 else "🥉" if rank == 3 else "💀"
                             st.write(f"{icon} {p}: {pts} pts (Rank: {rank})")
+                    
                     st.divider()
     else:
         st.info("No history available yet.")
+
 
 
 
