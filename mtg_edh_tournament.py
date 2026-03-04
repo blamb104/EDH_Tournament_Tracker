@@ -205,7 +205,7 @@ with tab1:
             mime='text/csv',
         )
     else:
-        st.info("Add players and start a round!")
+        st.info("Add players in the sidebar. The leaderboard will be displayed after you start Round 1.")
 
 with tab2:
     if st.session_state.current_round == 0:
@@ -363,6 +363,7 @@ with tab3:
 
     else:
         st.info("No history available yet.")
+
 
 
 
