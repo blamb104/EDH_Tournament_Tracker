@@ -209,21 +209,26 @@ with tab1:
 
 with tab2:
     if st.session_state.current_round == 0:
-        if st.button("Start Round 1", type="primary"):
-            generate_commander_pods(); st.rerun()
+        if st.button("🚀 Start Round 1", type="primary"):
+            generate_commander_pods()
+            st.rerun()
+            
     elif st.session_state.current_pods:
         st.header(f"⚔️ Round {st.session_state.current_round}")
-        results = []
-        ready = True
+        
+        results_to_submit = []
+        all_pods_filled = True  # Logic gate for the Submit button
         
         for i, pod in enumerate(st.session_state.current_pods):
             with st.expander(f"Pod {i+1} ({len(pod)} players)", expanded=True):
                 if st.session_state.mode == "Casual":
                     win = st.selectbox("Winner?", ["Select..."] + pod, key=f"w_{i}")
-                    if win == "Select...": ready = False
-                    else: results.append({'players': pod, 'winner': win, 'type': 'Casual'})
+                    if win == "Select...":
+                        all_pods_filled = False
+                    results_to_submit.append({'players': pod, 'winner': win, 'type': 'Casual'})
+                
                 else:
-                    # NEW: Updated Table Kill and Point Preview
+                    # Competitive Logic
                     tk = st.checkbox("Table Kill? (Winner 1st, others 4th)", key=f"tk_{i}")
                     p_ranks = {}
                     pts_map = {1: 5, 2: 3, 3: 2, 4: 1}
@@ -233,29 +238,30 @@ with tab2:
                         for p in pod: 
                             p_ranks[p] = 1 if p == tw else 4 
                     else:
-                        # Manual Ranking
                         cols = st.columns(len(pod))
                         for j, p in enumerate(pod):
-                            p_ranks[p] = cols[j].number_input(
-                                f"{p}", 1, 4, step=1, key=f"r_{p}_{i}"
-                            )
+                            p_ranks[p] = cols[j].number_input(f"{p}", 1, 4, step=1, key=f"r_{p}_{i}")
                     
-                    # --- QUALITY OF LIFE: POINT PREVIEW ---
+                    # Point Preview QoL
                     pod_points = [pts_map.get(rank, 1) for rank in p_ranks.values()]
-                    total_p = sum(pod_points)
-                    num_winners = list(p_ranks.values()).count(1)
+                    st.caption(f"Points being awarded: {pod_points} (Total: {sum(pod_points)})")
                     
-                    c1, c2 = st.columns([1, 1])
-                    c1.metric("Pod Total Points", f"{total_p} pts")
-                    
-                    if num_winners > 1:
-                        st.warning(f"⚠️ Note: {num_winners} players are marked as 1st Place.")
-                    
-                    results.append({'players': pod, 'ranks': p_ranks, 'type': 'Competitive'})
+                    results_to_submit.append({'players': pod, 'ranks': p_ranks, 'type': 'Competitive'})
+
+        st.divider()
+        
+        if st.button("✅ Submit Round Results", type="primary", disabled=not all_pods_filled):
+            st.session_state.history.append(results_to_submit)
+            st.session_state.current_pods = [] # Clear active pods to allow next round generation
+            st.success("Results recorded successfully!")
+            st.rerun()
+
     else:
-        st.success(f"Round {st.session_state.current_round} Complete.")
+        # This shows after a round is submitted but before the next is generated
+        st.success(f"Round {st.session_state.current_round} submitted.")
         if st.button("➡️ Generate Next Round", type="primary"):
-            generate_commander_pods(); st.rerun()
+            generate_commander_pods()
+            st.rerun()
 
 with tab3:
     st.header("📜 History")
@@ -269,6 +275,7 @@ with tab3:
                         st.write(f"Winner: **{pod['winner']}**")
                     else:
                         st.write(f"Ranks: {pod['ranks']}")
+
 
 
 
