@@ -263,7 +263,7 @@ with tab2:
                 
     # --- PHASE 2: ACTIVE PODS (Score Reporting View) ---
     else:
-        st.header(f"⚔️ Round {st.session_state.current_round} reporting")
+        st.header(f"⚔️ Round {st.session_state.current_round}")
         st.info("Enter the results for each pod below.")
         
         results_to_submit = []
@@ -400,6 +400,7 @@ with tab3:
 
     else:
         st.info("No matches played yet. Results will appear here once submitted.")
+
 
 
 
