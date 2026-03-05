@@ -240,7 +240,7 @@ with tab2:
     if not st.session_state.current_pods:
         # Display the success message if a round was just finished
         if 'last_round_submitted' in st.session_state and st.session_state.last_round_submitted > 0:
-            st.success(f"✅ Round {st.session_state.last_round_submitted} results recorded successfully! Check the Standings or History tabs for details.")
+            st.success(f"Round {st.session_state.last_round_submitted} results recorded successfully!")
 
         num_players = len(st.session_state.players)
         
@@ -249,12 +249,10 @@ with tab2:
             st.header("⚔️ Prepare for Battle")
             st.warning(f"⚠️ **Minimum 6 players required.** (Current: {num_players})")
             st.info("To create balanced 3 and 4-person pods, we need at least 6 players registered in the sidebar.")
-            st.button("Start Round 1", type="primary", disabled=True)
+            st.button("Start Tournament", type="primary", disabled=True)
         else:
-            st.header("⚔️ Next Round Generation")
-            st.write(f"Ready to sort **{num_players} players** into optimal pods.")
-            
-            label = "Start Round 1" if st.session_state.current_round == 0 else f"➡️ Generate Round {st.session_state.current_round + 1}"
+            st.header("⚔️ Prepare for Battle")
+            label = "Start Tournamnet" if st.session_state.current_round == 0 else f"➡️ Generate Round {st.session_state.current_round + 1}"
             
             if st.button(label, type="primary", use_container_width=True):
                 # Reset the success notification for the new round
@@ -402,5 +400,6 @@ with tab3:
 
     else:
         st.info("No matches played yet. Results will appear here once submitted.")
+
 
 
