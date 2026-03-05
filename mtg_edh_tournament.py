@@ -192,20 +192,22 @@ tab1, tab2, tab3 = st.tabs(["📊 Standings", "⚔️ Active Pods", "📜 Histor
 
 with tab1:
     st.header("🏆 Leaderboard")
-    df = get_commander_standings()
-    if not df.empty:
+    
+    # Check if ANY results have been submitted yet
+    if not st.session_state.history:
+        st.info("The battlefield is empty! Add players in the sidebar and finalize Round 1 to see the leaderboard.")
+    else:
+        df = get_commander_standings()
         st.dataframe(df, use_container_width=True, hide_index=True)
+        
         # --- EXPORT TO CSV ---
         csv = df.to_csv(index=False).encode('utf-8')
-        
         st.download_button(
             label="📥 Export Standings to CSV",
             data=csv,
-            file_name=f"EDH_Standings.csv",
+            file_name=f"EDH_Tournament_Standings.csv",
             mime='text/csv',
         )
-    else:
-        st.info("Add players in the sidebar. The leaderboard will be displayed after you start Round 1.")
 
 with tab2:
     if st.session_state.current_round == 0:
@@ -363,6 +365,7 @@ with tab3:
 
     else:
         st.info("No history available yet.")
+
 
 
 
