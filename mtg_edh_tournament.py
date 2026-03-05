@@ -195,7 +195,7 @@ with tab1:
     
     # Check if ANY results have been submitted yet
     if not st.session_state.history:
-        st.info("The battlefield is empty! Add players in the sidebar and finalize Round 1 to see the leaderboard.")
+        st.info("Add players in the sidebar. The leaderboard will be displayed after you finalize Round 1.")
     else:
         df = get_commander_standings()
         st.dataframe(df, use_container_width=True, hide_index=True)
@@ -365,6 +365,7 @@ with tab3:
 
     else:
         st.info("No history available yet.")
+
 
 
 
