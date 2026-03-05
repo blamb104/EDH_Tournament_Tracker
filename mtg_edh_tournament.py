@@ -152,39 +152,29 @@ with st.sidebar:
     st.divider()
     st.subheader("Registration")
         # Adding 'on_change' and 'key' makes hitting Enter work instantly
-    st.text_input(
-            "Enter Player Name:", 
-            key="player_input", 
-            on_change=add_player_callback,
-            placeholder="Type name and hit Enter...",
-            autocomplete="new-password" 
-        )
-        
-    st.write(f"**Total Players:** {len(st.session_state.players)}")
-
-    # Check if the tournament has NOT started yet
     if st.session_state.current_round == 0:
-        if st.session_state.players:
-            with st.expander("View/Remove Players"):
-                for p in st.session_state.players:
-                    cols = st.columns([4, 1])
-                    cols[0].write(p)
-                    if cols[1].button("❌", key=f"del_{p}"):
-                        st.session_state.players.remove(p)
-                        st.rerun()
-        else:
-            st.info("Waiting for players...")
+        st.text_input(
+        "Enter Player Name:", 
+        key="player_input", 
+        on_change=add_player_callback,
+        placeholder="Type name and hit Enter...",
+        autocomplete="new-password" 
+        )
     else:
         # This shows once Round 1 is generated
         st.success(f"🏆 Tournament in Progress (Round {st.session_state.current_round})")
-        # You might still want to see the players, so we can keep the expander here too
+        
+    if st.session_state.players:
+        st.write(f"**Total Players:** {len(st.session_state.players)}") 
         with st.expander("View/Remove Players"):
-                for p in st.session_state.players:
-                    cols = st.columns([4, 1])
-                    cols[0].write(p)
-                    if cols[1].button("❌", key=f"del_{p}"):
-                        st.session_state.players.remove(p)
-                        st.rerun()
+            for p in st.session_state.players:
+                cols = st.columns([4, 1])
+                cols[0].write(p)
+                if cols[1].button("❌", key=f"del_{p}"):
+                    st.session_state.players.remove(p)
+                    st.rerun()
+    else:
+        st.info("Waiting for players...")
 
 # --- MAIN UI ---
 st.title("🛡️ EDH Tournament")
@@ -365,6 +355,7 @@ with tab3:
 
     else:
         st.info("No history available yet.")
+
 
 
 
