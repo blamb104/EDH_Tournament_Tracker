@@ -356,8 +356,7 @@ with tab3:
         # --- CSV EXPORT LOGIC ---
         if st.session_state.history:
             st.divider()
-            st.subheader("💾 Export Data")
-        
+
         flat_history = []
         for round_idx, rnd in enumerate(st.session_state.history):
             for pod_idx, pod in enumerate(rnd):
@@ -394,6 +393,7 @@ with tab3:
 
     else:
         st.info("No matches played yet. Results will appear here once submitted.")
+
 
 
 
