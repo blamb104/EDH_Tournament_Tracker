@@ -14,7 +14,7 @@ if 'current_pods' not in st.session_state:
 if 'mode' not in st.session_state:
     st.session_state.mode = "Casual"
 
-st.set_page_config(page_title="MTG Commander Tracker", layout="wide")
+st.set_page_config(page_title="EDH Tournament Tracker", layout="wide")
 
 # --- LOGIC FUNCTIONS ---
 def generate_commander_pods():
@@ -253,7 +253,7 @@ with tab2:
         else:
             label = "Start Tournamnet" if st.session_state.current_round == 0 else f"➡️ Generate Round {st.session_state.current_round + 1}"
             
-            if st.button(label, type="primary", use_container_width=True):
+            if st.button(label):
                 # Reset the success notification for the new round
                 st.session_state.last_round_submitted = 0 
                 st.toast("Calculating pairings to minimize rematches...", icon="⚔️")
@@ -399,6 +399,7 @@ with tab3:
 
     else:
         st.info("No matches played yet. Results will appear here once submitted.")
+
 
 
 
