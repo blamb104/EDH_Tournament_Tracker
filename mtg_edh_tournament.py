@@ -125,6 +125,42 @@ def add_player_callback():
     # Clear the input box by resetting the key
     st.session_state.player_input = ""
 
+@st.dialog("Review Round Results")
+def confirm_results_dialog(results):
+    st.write(f"### 🛡️ Round {st.session_state.current_round} Summary")
+    st.write("Please verify the results for each pod before finalizing:")
+    st.divider()
+
+    for i, entry in enumerate(results):
+        st.markdown(f"#### Pod {i+1}")
+        
+        if entry.get('type') == 'Casual':
+            winner = entry['winner']
+            players = entry['players']
+            for p in players:
+                icon = "👑 **Winner**" if p == winner else "⚔️ Participant"
+                st.write(f"- {p}: {icon}")
+        else:
+            # Competitive: Sort by rank to show 1st place at the top
+            ranks = entry['ranks']
+            sorted_ranks = sorted(ranks.items(), key=lambda x: x[1])
+            summary = []
+            for p, r in sorted_ranks:
+                medal = "🥇" if r == 1 else "🥈" if r == 2 else "🥉" if r == 3 else "💀"
+                summary.append(f"{medal} **{p}** (Rank {r})")
+            st.write("  \n".join(summary))
+        st.divider()
+    
+    col1, col2 = st.columns(2)
+    if col1.button("Confirm and Finalize", type="primary", use_container_width=True):
+        st.session_state.history.append(results)
+        st.session_state.current_pods = [] # Clears pods to trigger "Generate" view
+        st.session_state.last_round_submitted = st.session_state.current_round
+        st.rerun()
+    
+    if col2.button("Back to Editing", use_container_width=True):
+        st.rerun()
+
 # --- SIDEBAR ---
 with st.sidebar:
     st.title("Tournament Setup")
@@ -178,14 +214,14 @@ with st.sidebar:
 
 # --- MAIN UI ---
 st.title("🛡️ EDH Tournament")
-tab1, tab2, tab3 = st.tabs(["🏆 Standings", "⚔️ Active Pods", "📜 History"])
+tab1, tab2, tab3 = st.tabs(["🏆 Leaderboard", "⚔️ Active Pods", "📜 Match History"])
 
 with tab1:
     st.header("🏆 Leaderboard")
     
     # Check if ANY results have been submitted yet
     if not st.session_state.history:
-        st.info("Add players in the sidebar. The leaderboard will be displayed after you finalize Round 1.")
+        st.info("Add players in the sidebar. The leaderboard will be displayed after you submit Round 1 results.")
     else:
         df = get_commander_standings()
         st.dataframe(df, use_container_width=True, hide_index=True)
@@ -200,47 +236,65 @@ with tab1:
         )
 
 with tab2:
-    if st.session_state.current_round == 0:
-        # Check for minimum player count
+    # --- PHASE 1: NO ACTIVE PODS (Generation View) ---
+    if not st.session_state.current_pods:
+        # Display the success message if a round was just finished
+        if 'last_round_submitted' in st.session_state and st.session_state.last_round_submitted > 0:
+            st.success(f"✅ Round {st.session_state.last_round_submitted} results recorded successfully! Check the Standings or History tabs for details.")
+
         num_players = len(st.session_state.players)
         
+        # Minimum player check
         if num_players < 6:
             st.header("⚔️ Prepare for Battle")
             st.warning(f"⚠️ **Minimum 6 players required.** (Current: {num_players})")
-            st.info("The pairing logic requires at least 6 players to properly distribute pods of 3 and 4.")
-            
-            # Show a disabled button so they know where to click later
-            st.button("Start Round 1", type="primary", disabled=True, help="Add more players in the sidebar first!")
+            st.info("To create balanced 3 and 4-person pods, we need at least 6 players registered in the sidebar.")
+            st.button("Start Round 1", type="primary", disabled=True)
         else:
-            # Requirements met - allow start
-            st.success(f"Ready to go! {num_players} players registered.")
-            if st.button("Start Round 1", type="primary"):
-                # A quick pop-up toast for flair
-                st.toast("Generating Pods...", icon="⚔️")
+            st.header("⚔️ Next Round Generation")
+            st.write(f"Ready to sort **{num_players} players** into optimal pods.")
+            
+            label = "Start Round 1" if st.session_state.current_round == 0 else f"➡️ Generate Round {st.session_state.current_round + 1}"
+            
+            if st.button(label, type="primary", use_container_width=True):
+                # Reset the success notification for the new round
+                st.session_state.last_round_submitted = 0 
+                st.toast("Calculating pairings to minimize rematches...", icon="⚔️")
                 generate_commander_pods()
                 st.rerun()
                 
-    elif st.session_state.current_pods:
-        st.header(f"⚔️ Round {st.session_state.current_round}")
+    # --- PHASE 2: ACTIVE PODS (Score Reporting View) ---
+    else:
+        st.header(f"⚔️ Round {st.session_state.current_round} reporting")
+        st.info("Enter the results for each pod below.")
         
         results_to_submit = []
-        all_pods_filled = True  # Logic gate for the Submit button
+        all_pods_filled = True 
         
+        # Loop through each pod generated by generate_commander_pods()
         for i, pod in enumerate(st.session_state.current_pods):
-            # Create a string of player names, e.g., "Alice, Bob, Charlie"
             player_names = ", ".join(pod)
             
-            # Make the headers to show pod members.
             with st.expander(f"Pod {i+1}: {player_names}", expanded=True):
+                # --- CASUAL SCORING ---
                 if st.session_state.mode == "Casual":
-                    win = st.selectbox("Winner?", ["Select..."] + pod, key=f"w_{i}")
+                    win = st.selectbox(
+                        "Who won this game?", 
+                        ["Select..."] + pod, 
+                        key=f"w_{st.session_state.current_round}_{i}"
+                    )
+                    
                     if win == "Select...":
                         all_pods_filled = False
+                        st.caption("Waiting for a winner...")
+                    else:
+                        st.success(f"Winner: {win}")
+                    
                     results_to_submit.append({'players': pod, 'winner': win, 'type': 'Casual'})
                 
+                # --- COMPETITIVE SCORING ---
                 else:
-                    # Competitive Logic
-                    tk = st.checkbox("Table Kill? (Winner 1st, others 4th)", key=f"tk_{i}")
+                    tk = st.checkbox("Table Kill? (Winner takes 1st, everyone else takes 4th)", key=f"tk_{i}")
                     p_ranks = {}
                     pts_map = {1: 5, 2: 3, 3: 2, 4: 1}
                     
@@ -249,40 +303,33 @@ with tab2:
                         for p in pod: 
                             p_ranks[p] = 1 if p == tw else 4 
                     else:
+                        st.write("Assign Ranks (1-4):")
                         cols = st.columns(len(pod))
                         for j, p in enumerate(pod):
                             p_ranks[p] = cols[j].number_input(f"{p}", 1, 4, step=1, key=f"r_{p}_{i}")
                     
-                    # --- QUALITY OF LIFE: POINT PREVIEW ---
+                    # Point Preview Metric
                     pod_points = [pts_map.get(rank, 1) for rank in p_ranks.values()]
-                    total_p = sum(pod_points)
                     num_winners = list(p_ranks.values()).count(1)
                     
-                    c1, c2 = st.columns([1, 1])
-                    c1.metric("Pod Total Points", f"{total_p} pts")
-                    
+                    m1, m2 = st.columns(2)
+                    m1.metric("Total Pod Points", f"{sum(pod_points)} pts")
                     if num_winners > 1:
-                        st.warning(f"⚠️ Note: {num_winners} players are marked as 1st Place.")
+                        m2.warning(f"Multiple winners ({num_winners}) detected.")
                     
                     results_to_submit.append({'players': pod, 'ranks': p_ranks, 'type': 'Competitive'})
 
         st.divider()
         
-        if st.button("✅ Submit Round Results", type="primary", disabled=not all_pods_filled):
-            st.session_state.history.append(results_to_submit)
-            st.session_state.current_pods = [] # Clear active pods to allow next round generation
-            st.success("Results recorded successfully!")
-            st.rerun()
-
-    else:
-        # This shows after a round is submitted but before the next is generated
-        st.success(f"Round {st.session_state.current_round} submitted.")
-        if st.button("➡️ Generate Next Round", type="primary"):
-            generate_commander_pods()
-            st.rerun()
+        # Bottom Actions
+        col_sub, col_can = st.columns([3, 1])
+        
+        if col_sub.button("✅ Submit Round Results", type="primary", disabled=not all_pods_filled, use_container_width=True):
+            confirm_results_dialog(results_to_submit)
+            
 
 with tab3:
-    st.header("📜 History")
+    st.header("📜 Match History")
     if st.session_state.history:
         # Loop forward through history (Round 1, then Round 2, etc.)
         for idx, rnd in enumerate(st.session_state.history):
@@ -346,15 +393,14 @@ with tab3:
         csv_history = history_df.to_csv(index=False).encode('utf-8')
 
         st.download_button(
-            label="📥 Download Full Match History (CSV)",
+            label="📥 Download Match History (CSV)",
             data=csv_history,
-            file_name=f"EDH_Tournament_History_Full.csv",
+            file_name=f"EDH_Tournament_History.csv",
             mime='text/csv',
             use_container_width=True
         )
 
     else:
-        st.info("No history available yet.")
-
+        st.info("No matches played yet. Results will appear here once submitted.")
 
 
