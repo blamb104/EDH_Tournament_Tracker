@@ -221,7 +221,7 @@ with tab1:
     
     # Check if ANY results have been submitted yet
     if not st.session_state.history:
-        st.info("Add players in the sidebar. The leaderboard will be displayed after you submit Round 1 results.")
+        st.info("The leaderboard will be displayed here after you submit Round 1 results.")
     else:
         df = get_commander_standings()
         st.dataframe(df, use_container_width=True, hide_index=True)
@@ -394,6 +394,7 @@ with tab3:
 
     else:
         st.info("No matches played yet. Results will appear here once submitted.")
+
 
 
 
