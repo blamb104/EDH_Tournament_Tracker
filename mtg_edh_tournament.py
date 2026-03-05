@@ -238,6 +238,7 @@ with tab1:
 with tab2:
     # --- PHASE 1: NO ACTIVE PODS (Generation View) ---
     if not st.session_state.current_pods:
+        st.header("⚔️ Prepare for Battle")
         # Display the success message if a round was just finished
         if 'last_round_submitted' in st.session_state and st.session_state.last_round_submitted > 0:
             st.success(f"Round {st.session_state.last_round_submitted} results recorded successfully!")
@@ -246,7 +247,6 @@ with tab2:
         
         # Minimum player check
         if num_players < 6:
-            st.header("⚔️ Prepare for Battle")
             st.warning(f"⚠️ **Minimum 6 players required.** (Current: {num_players})")
             st.info("To create balanced 3 and 4-person pods, we need at least 6 players registered in the sidebar.")
             st.button("Start Tournament", type="primary", disabled=True)
@@ -399,6 +399,7 @@ with tab3:
 
     else:
         st.info("No matches played yet. Results will appear here once submitted.")
+
 
 
 
