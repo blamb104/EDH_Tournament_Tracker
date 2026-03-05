@@ -316,11 +316,7 @@ with tab2:
                     results_to_submit.append({'players': pod, 'ranks': p_ranks, 'type': 'Competitive'})
 
         st.divider()
-        
-        # Bottom Actions
-        col_sub, col_can = st.columns([3, 1])
-        
-        if col_sub.button("✅ Submit Round Results", type="primary", disabled=not all_pods_filled, use_container_width=True):
+        if st.button("✅ Submit Round Results", disabled=not all_pods_filled, use_container_width=True):
             confirm_results_dialog(results_to_submit)
             
 
@@ -398,6 +394,7 @@ with tab3:
 
     else:
         st.info("No matches played yet. Results will appear here once submitted.")
+
 
 
 
