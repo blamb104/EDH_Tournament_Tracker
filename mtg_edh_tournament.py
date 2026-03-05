@@ -251,7 +251,6 @@ with tab2:
             st.info("To create balanced 3 and 4-person pods, we need at least 6 players registered in the sidebar.")
             st.button("Start Tournament", type="primary", disabled=True)
         else:
-            st.header("⚔️ Prepare for Battle")
             label = "Start Tournamnet" if st.session_state.current_round == 0 else f"➡️ Generate Round {st.session_state.current_round + 1}"
             
             if st.button(label, type="primary", use_container_width=True):
@@ -400,6 +399,7 @@ with tab3:
 
     else:
         st.info("No matches played yet. Results will appear here once submitted.")
+
 
 
 
