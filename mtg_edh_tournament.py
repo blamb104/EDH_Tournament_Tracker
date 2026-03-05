@@ -178,7 +178,7 @@ with st.sidebar:
 
 # --- MAIN UI ---
 st.title("🛡️ EDH Tournament")
-tab1, tab2, tab3 = st.tabs(["📊 Standings", "⚔️ Active Pods", "📜 History"])
+tab1, tab2, tab3 = st.tabs(["🏆 Standings", "⚔️ Active Pods", "📜 History"])
 
 with tab1:
     st.header("🏆 Leaderboard")
@@ -355,6 +355,7 @@ with tab3:
 
     else:
         st.info("No history available yet.")
+
 
 
 
