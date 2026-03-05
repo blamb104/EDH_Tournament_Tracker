@@ -248,8 +248,7 @@ with tab2:
         # Minimum player check
         if num_players < 6:
             st.warning(f"⚠️ **Minimum 6 players required.** (Current: {num_players})")
-            st.info("To create balanced 3 and 4-person pods, we need at least 6 players registered in the sidebar.")
-            st.button("Start Tournament", type="primary", disabled=True)
+            st.button("Start Tournament", disabled=True)
         else:
             label = "Start Tournamnet" if st.session_state.current_round == 0 else f"➡️ Generate Round {st.session_state.current_round + 1}"
             
@@ -399,6 +398,7 @@ with tab3:
 
     else:
         st.info("No matches played yet. Results will appear here once submitted.")
+
 
 
 
