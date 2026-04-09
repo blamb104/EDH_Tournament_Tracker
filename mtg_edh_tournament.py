@@ -235,9 +235,11 @@ if st.session_state.active_event_code:
             
             for i, pod in enumerate(st.session_state.current_pods):
                 pod_num = i + 1
-                with st.expander(f"Pod {pod_num}", expanded=True):
+                # DISPLAY NAMES IN TITLE
+                pod_label = f"Pod {pod_num}: {', '.join(pod)}"
+                
+                with st.expander(pod_label, expanded=True):
                     if is_admin:
-                        # Admin View: Reporting Controls
                         if st.session_state.scoring_mode == "Casual":
                             win = st.selectbox("Winner", ["Select..."] + pod, key=f"win_{i}")
                             if win == "Select...": all_reported = False
@@ -248,8 +250,9 @@ if st.session_state.active_event_code:
                             max_p = max(pod_points.values())
                             for p, pts in pod_points.items(): results_data.append({"event_code": st.session_state.active_event_code, "Round": st.session_state.current_round, "Pod": pod_num, "Player": p, "Points": pts, "Result": "Winner" if pts == max_p and pts > 0 else "Participant"})
                     else:
-                        # Player View: Simple list of pairings
-                        st.write(" • " + "\n • ".join(pod))
+                        st.write("Participants:")
+                        for p in pod:
+                            st.write(f"• {p}")
             
             if is_admin and st.button("Finalize Round", disabled=not all_reported, type="primary"):
                 try:
@@ -268,7 +271,8 @@ if st.session_state.active_event_code:
                     round_data = event_history[event_history['Round'] == r]
                     pods_in_round = sorted(round_data['Pod'].unique())
                     for p_num in pods_in_round:
-                        st.markdown(f"**Pod {int(p_num)}**")
+                        pod_players = round_data[round_data['Pod'] == p_num]['Player'].tolist()
+                        st.markdown(f"**Pod {int(p_num)}: {', '.join(pod_players)}**")
                         pod_df = round_data[round_data['Pod'] == p_num][["Player", "Result", "Points"]]
                         st.table(pod_df)
                         st.divider()
