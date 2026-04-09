@@ -30,7 +30,6 @@ def load_sheet(name, force_refresh=False):
 # --- 2. AUTHENTICATION ---
 if not st.user.get("is_logged_in"):
     st.title("EDH Tournament Portal")
-    st.info("Please log in with Google to manage or join an event.")
     if st.button("Log in with Google"):
         st.login()
     st.stop()
@@ -108,9 +107,12 @@ def split_into_swiss_pods(players, history_df):
 # --- 5. DATA SYNC ---
 if st.session_state.active_event_code:
     hist_df = load_sheet("MatchHistory", force_refresh=False)
-    event_history = hist_df[hist_df['event_code'] == st.session_state.active_event_code]
-    if not event_history.empty and not st.session_state.current_pods:
-        st.session_state.current_round = int(event_history['Round'].max()) + 1
+    event_history = hist_df[hist_df['event_code'] == st.session_state.active_event_code].copy()
+    if not event_history.empty:
+        # Format fix for points (ensure integer display)
+        event_history['Points'] = event_history['Points'].astype(int)
+        if not st.session_state.current_pods:
+            st.session_state.current_round = int(event_history['Round'].max()) + 1
     elif event_history.empty and not st.session_state.current_pods:
         st.session_state.current_round = 1
 else:
@@ -185,7 +187,7 @@ with st.sidebar:
 
         if st.button("Sync Data", use_container_width=True, type="secondary"):
             st.cache_data.clear(); st.rerun()
-        if is_admin and st.button("End Tournament", type="primary", use_container_width=True):
+        if is_admin and st.button("End Tournament", use_container_width=True, type="primary"):
             st.session_state.active_event_code = ""; st.session_state.current_pods = []; st.session_state.current_round = 1; st.cache_data.clear(); st.rerun()
 
 # --- 7. MAIN UI ---
@@ -237,24 +239,23 @@ if st.session_state.active_event_code:
     with tab3:
         st.header("📜 Match History")
         if not event_history.empty:
-            rounds = sorted(event_history['Round'].unique(), reverse=True)
-            # Add a 'Full View' option at the end of the round list
-            round_tab_names = [f"Round {r}" for r in rounds] + ["Full Table View"]
-            history_tabs = st.tabs(round_tab_names)
+            # Sort rounds chronologically (Round 1 at top)
+            rounds = sorted(event_history['Round'].unique())
             
-            for i, r in enumerate(rounds):
-                with history_tabs[i]:
+            for r in rounds:
+                with st.expander(f"🏅 ROUND {int(r)}", expanded=(r == max(rounds))):
                     round_data = event_history[event_history['Round'] == r]
                     pods_in_round = sorted(round_data['Pod'].unique())
-                    pod_tab_names = [f"Pod {p}" for p in pods_in_round]
-                    pod_tabs = st.tabs(pod_tab_names)
                     
-                    for j, p_num in enumerate(pods_in_round):
-                        with pod_tabs[j]:
-                            pod_df = round_data[round_data['Pod'] == p_num][["Player", "Result", "Points"]]
-                            st.table(pod_df) # Using table for a clean, non-interactive look
+                    # Create columns for pods or just list them vertically
+                    for p_num in pods_in_round:
+                        st.markdown(f"**Pod {int(p_num)}**")
+                        pod_df = round_data[round_data['Pod'] == p_num][["Player", "Result", "Points"]]
+                        st.table(pod_df)
+                        st.divider()
             
-            with history_tabs[-1]:
-                st.dataframe(event_history.sort_values(by=["Round", "Pod"], ascending=[False, True]), use_container_width=True, hide_index=True)
+            st.divider()
+            with st.expander("🔍 View All Match Data (Raw Table)"):
+                st.dataframe(event_history.sort_values(by=["Round", "Pod"], ascending=[True, True]), use_container_width=True, hide_index=True)
         else:
             st.info("No matches have been played yet.")
