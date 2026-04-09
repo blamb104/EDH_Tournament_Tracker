@@ -173,7 +173,7 @@ with st.sidebar:
 
         if st.button("Sync Data", use_container_width=True):
             st.cache_data.clear(); st.rerun()
-        if is_admin and st.button("End Tournament", type="secondary", use_container_width=True):
+        if is_admin and st.button("End Tournament", type="primary", use_container_width=True):
             st.session_state.active_event_code = ""; st.session_state.current_pods = []; st.session_state.current_round = 1; st.cache_data.clear(); st.rerun()
 
 # --- 7. MAIN UI ---
