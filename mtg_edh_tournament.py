@@ -9,6 +9,7 @@ st.set_page_config(page_title="EDH Tournament Tracker", layout="wide")
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 def load_sheet(name, force_refresh=False):
+    # Cache results for 10 minutes unless force_refresh is True
     ttl = 0 if force_refresh else 600
     return conn.read(worksheet=name, ttl=ttl)
 
@@ -100,16 +101,16 @@ def split_into_swiss_pods(players, history_df):
         pods.append(current_pod)
     return pods
 
-# --- 5. DATA SYNC ---
+# --- 5. DATA SYNC (Optimized to prevent glitching) ---
 if st.session_state.active_event_code:
-    # Force refresh to ensure we have the latest from the sheet
-    hist_df = load_sheet("MatchHistory", force_refresh=True)
-    # Filter ONLY for the current event code
+    # Use standard cache for regular UI interactions
+    hist_df = load_sheet("MatchHistory", force_refresh=False)
     event_history = hist_df[hist_df['event_code'] == st.session_state.active_event_code]
     
+    # Update round based on history only if we aren't currently in the middle of a pod session
     if not event_history.empty and not st.session_state.current_pods:
         st.session_state.current_round = int(event_history['Round'].max()) + 1
-    elif event_history.empty:
+    elif event_history.empty and not st.session_state.current_pods:
         st.session_state.current_round = 1
 else:
     event_history = pd.DataFrame()
@@ -132,7 +133,7 @@ with st.sidebar:
             if st.button("Create New Event", use_container_width=True):
                 new_code = create_event(user_email)
                 st.session_state.active_event_code = new_code
-                st.session_state.current_round = 1 # Reset round for new session
+                st.session_state.current_round = 1
                 st.rerun()
         input_code = st.text_input("Enter Event Code:").upper().strip()
         if input_code:
@@ -170,6 +171,7 @@ with st.sidebar:
                 if st.button("Add Late"):
                     p_df = load_sheet("Players", force_refresh=True)
                     conn.update(worksheet="Players", data=pd.concat([p_df, pd.DataFrame([{"event_code": st.session_state.active_event_code, "player_name": late_p}])], ignore_index=True))
+                    st.cache_data.clear()
                     st.rerun()
                 
                 p_df = load_sheet("Players")
@@ -177,6 +179,7 @@ with st.sidebar:
                 drop_p = st.selectbox("Drop Player", ["-- Select --"] + confirmed_list)
                 if st.button("Confirm Drop") and drop_p != "-- Select --":
                     drop_player(st.session_state.active_event_code, drop_p)
+                    st.cache_data.clear()
                     st.rerun()
 
         st.divider()
@@ -184,7 +187,12 @@ with st.sidebar:
             st.cache_data.clear()
             st.rerun()
         if is_admin and st.button("End Tournament", type="secondary", use_container_width=True):
-            st.session_state.active_event_code = ""; st.session_state.current_pods = []; st.session_state.registration_list = []; st.session_state.current_round = 1; st.rerun()
+            st.session_state.active_event_code = ""
+            st.session_state.current_pods = []
+            st.session_state.registration_list = []
+            st.session_state.current_round = 1
+            st.cache_data.clear()
+            st.rerun()
 
 # --- 7. MAIN UI ---
 if st.session_state.active_event_code:
@@ -234,9 +242,11 @@ if st.session_state.active_event_code:
                 new_data_df = pd.DataFrame(results_data)
                 final_hist = pd.concat([hist, new_data_df], ignore_index=True)
                 conn.update(worksheet="MatchHistory", data=final_hist)
+                
+                # Clear cache so Round sync sees the new data
+                st.cache_data.clear()
                 st.session_state.current_pods = []
                 st.session_state.current_round += 1
-                st.cache_data.clear() 
                 st.rerun()
 
     with tab3:
