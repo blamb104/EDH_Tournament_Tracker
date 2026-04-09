@@ -15,12 +15,17 @@ if "event" in query_params and "active_event_code" not in st.session_state:
     st.session_state.active_event_code = query_params["event"]
 
 # --- 3. GLOBAL DATA LOAD ---
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=600)
 def get_all_data():
     events = conn.read(worksheet="Events")
     players = conn.read(worksheet="Players")
     history = conn.read(worksheet="MatchHistory")
     active_pods = conn.read(worksheet="CurrentPods")
+    if not history.empty:
+        history['Round'] = history['Round'].fillna(0).astype(int)
+        history['Pod'] = history['Pod'].fillna(0).astype(int)
+    if not active_pods.empty:
+        active_pods['Pod'] = active_pods['Pod'].fillna(0).astype(int)
     return events, players, history, active_pods
 
 events_df, players_df, history_df, active_pods_df = get_all_data()
@@ -106,7 +111,7 @@ with st.sidebar:
         st.subheader(f"Code: {st.session_state.active_event_code}")
         
         # Manually refresh the data from Google Sheets
-        if st.button("Refresh Data 🔄", use_container_width=True):
+        if st.button("Refresh Data", use_container_width=True):
             st.cache_data.clear()
             st.rerun()
 
