@@ -8,37 +8,58 @@ from streamlit_gsheets import GSheetsConnection
 st.set_page_config(page_title="EDH Tournament Tracker", layout="wide")
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# --- 2. URL QUERY PARAMETER HANDLING ---
-# Persists the event code in the URL so browser refresh doesn't boot users out
-query_params = st.query_params
-if "event" in query_params and "active_event_code" not in st.session_state:
-    st.session_state.active_event_code = query_params["event"]
+# Custom CSS for the "End Tournament" button
+st.markdown("""
+    <style>
+    div[data-testid="stButton"] button:has(div:contains("End Tournament")) {
+        background-color: #ff4b4b;
+        color: white;
+        border: none;
+    }
+    div[data-testid="stButton"] button:has(div:contains("End Tournament")):hover {
+        background-color: #ff3333;
+        color: white;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
-# --- 3. GLOBAL DATA LOAD ---
+# --- 2. GLOBAL DATA LOAD (With Integer Fix & 10-min Cache) ---
 @st.cache_data(ttl=600)
 def get_all_data():
     events = conn.read(worksheet="Events")
     players = conn.read(worksheet="Players")
     history = conn.read(worksheet="MatchHistory")
     active_pods = conn.read(worksheet="CurrentPods")
+    
+    # Fix the .0 integer issue at the source
     if not history.empty:
         history['Round'] = history['Round'].fillna(0).astype(int)
         history['Pod'] = history['Pod'].fillna(0).astype(int)
+        history['Points'] = history['Points'].fillna(0).astype(int)
     if not active_pods.empty:
         active_pods['Pod'] = active_pods['Pod'].fillna(0).astype(int)
+        
     return events, players, history, active_pods
 
 events_df, players_df, history_df, active_pods_df = get_all_data()
 
+# --- 3. URL & REDIRECT LOGIC ---
+query_params = st.query_params
+if "event" in query_params and "active_event_code" not in st.session_state:
+    st.session_state.active_event_code = query_params["event"]
+
+# Redirect if the event is no longer "Active" in the sheet
+if "active_event_code" in st.session_state and st.session_state.active_event_code:
+    active_list = events_df[events_df['status'] == 'Active']['event_code'].values
+    if st.session_state.active_event_code not in active_list:
+        st.session_state.active_event_code = ""
+        st.query_params.clear()
+        st.cache_data.clear()
+        st.rerun()
+
 # --- 4. SESSION STATE DEFAULTS ---
-states = {
-    'active_event_code': "",
-    'registration_list': [],
-    'scoring_mode': "Casual"
-}
-for key, val in states.items():
-    if key not in st.session_state:
-        st.session_state[key] = val
+if 'active_event_code' not in st.session_state: st.session_state.active_event_code = ""
+if 'registration_list' not in st.session_state: st.session_state.registration_list = []
 
 user_email = st.user.get("email").lower() if st.user.get("is_logged_in") else None
 
@@ -46,31 +67,23 @@ user_email = st.user.get("email").lower() if st.user.get("is_logged_in") else No
 def split_into_swiss_pods(players, history_df):
     n = len(players)
     if n < 3: return [players]
-    
-    # Calculate current standings
     scores = {p: 0 for p in players}
     past_matchups = set()
     if not history_df.empty:
         s_map = history_df.groupby('Player')['Points'].sum().to_dict()
         for p in scores: scores[p] = s_map.get(p, 0)
-        
-        # Track who has played whom to avoid repeats
-        cols = ['event_code', 'Round', 'Pod']
-        if all(c in history_df.columns for c in cols):
-            for _, group in history_df.groupby(cols):
-                m = group['Player'].tolist()
-                for i in range(len(m)):
-                    for j in range(i + 1, len(m)):
-                        past_matchups.add(frozenset([m[i], m[j]]))
+        for _, group in history_df.groupby(['event_code', 'Round', 'Pod']):
+            m = group['Player'].tolist()
+            for i in range(len(m)):
+                for j in range(i + 1, len(m)):
+                    past_matchups.add(frozenset([m[i], m[j]]))
 
-    # Determine pod sizes (aiming for 4s, using 3s for remainders)
     pod_sizes = ([4] * (n // 4))
     remainder = n % 4
     if remainder == 1: pod_sizes = ([4] * (max(0, len(pod_sizes)-2))) + [3, 3, 3]
     elif remainder == 2: pod_sizes = ([4] * (max(0, len(pod_sizes)-1))) + [3, 3]
     elif remainder == 3: pod_sizes.append(3)
     
-    # Sort players by score, then randomize within score brackets
     available = sorted(players, key=lambda x: (scores[x], random.random()), reverse=True)
     pods = []
     for size in pod_sizes:
@@ -87,137 +100,110 @@ def split_into_swiss_pods(players, history_df):
         pods.append(current_pod)
     return pods
 
-# --- 6. SIDEBAR CONTROLS ---
+# --- 6. SIDEBAR ---
 with st.sidebar:
-    st.title("Event Settings")
-    if not st.user.get("is_logged_in"):
-        if st.button("Admin Login"): st.login()
-    else:
+    st.title("Settings")
+    if st.user.get("is_logged_in"):
         user_img = st.user.get("picture", "https://cdn-icons-png.flaticon.com/512/149/149071.png")
-        user_name = st.user.get("name", "Admin")
-        
         cols = st.columns([1, 3])
         cols[0].image(user_img, width=40)
-        cols[1].write(f"**{user_name}**")
+        cols[1].write(f"**{st.user.get('name')}**")
         if st.button("Log Out"): st.logout()
+    else:
+        if st.button("Admin Login"): st.login()
+    
     st.divider()
 
     if not st.session_state.active_event_code:
         input_code = st.text_input("Enter Event Code:").upper().strip()
         if st.button("Load Event"):
-            if input_code in events_df['event_code'].values:
+            active_list = events_df[events_df['status'] == 'Active']['event_code'].values
+            if input_code in active_list:
                 st.session_state.active_event_code = input_code
                 st.query_params.event = input_code
                 st.rerun()
-            else: st.error("Invalid Code")
+            else: st.error("Event not found or inactive.")
     else:
         event_row = events_df[events_df['event_code'] == st.session_state.active_event_code].iloc[0]
         is_admin = (user_email == event_row['admin_email'].lower()) if user_email else False
         st.subheader(f"Code: {st.session_state.active_event_code}")
         
-        # Manually refresh the data from Google Sheets
-        if st.button("Refresh Data", use_container_width=True):
-            st.cache_data.clear()
-            st.rerun()
+        if st.button("Refresh Data 🔄", use_container_width=True):
+            st.cache_data.clear(); st.rerun()
 
         if is_admin:
             st.success("Admin Access")
-            current_confirmed = players_df[players_df['event_code'] == st.session_state.active_event_code]['player_name'].tolist()
-            
             with st.expander("Manage Roster"):
-                with st.form("add_player_form", clear_on_submit=True):
-                    name_input = st.text_input("New Player Name")
-                    if st.form_submit_button("Add to List"):
-                        if name_input and name_input not in st.session_state.registration_list:
-                            st.session_state.registration_list.append(name_input.strip())
-                
+                with st.form("add_player", clear_on_submit=True):
+                    name_in = st.text_input("Player Name")
+                    if st.form_submit_button("Add"):
+                        if name_in: st.session_state.registration_list.append(name_in.strip())
                 if st.session_state.registration_list:
-                    st.write("**Pending:**")
                     for p in st.session_state.registration_list: st.text(f"• {p}")
-                    if st.button("Confirm & Save to Sheet"):
-                        new_rows = pd.DataFrame([{"event_code": st.session_state.active_event_code, "player_name": p} for p in st.session_state.registration_list])
-                        conn.update(worksheet="Players", data=pd.concat([players_df, new_rows], ignore_index=True))
+                    if st.button("Save to Sheet"):
+                        new_reg = pd.DataFrame([{"event_code": st.session_state.active_event_code, "player_name": p} for p in st.session_state.registration_list])
+                        conn.update(worksheet="Players", data=pd.concat([players_df, new_reg], ignore_index=True))
                         st.session_state.registration_list = []; st.cache_data.clear(); st.rerun()
-                
-                if current_confirmed:
-                    drop_p = st.selectbox("Drop Player", ["-- Select --"] + current_confirmed)
-                    if st.button("Confirm Drop") and drop_p != "-- Select --":
-                        updated = players_df[~((players_df['event_code'] == st.session_state.active_event_code) & (players_df['player_name'] == drop_p))]
-                        conn.update(worksheet="Players", data=updated)
-                        st.cache_data.clear(); st.rerun()
-
+            
             if st.button("End Tournament", type="primary", use_container_width=True):
-                # Clean up active pods for this event code
+                events_df.loc[events_df['event_code'] == st.session_state.active_event_code, 'status'] = 'Inactive'
+                conn.update(worksheet="Events", data=events_df)
                 remaining_pods = active_pods_df[active_pods_df['event_code'] != st.session_state.active_event_code]
                 conn.update(worksheet="CurrentPods", data=remaining_pods)
-                st.session_state.active_event_code = ""
-                st.query_params.clear()
-                st.cache_data.clear(); st.rerun()
+                st.session_state.active_event_code = ""; st.query_params.clear(); st.cache_data.clear(); st.rerun()
         else:
             if st.button("Exit Event"):
-                st.session_state.active_event_code = ""
-                st.query_params.clear()
-                st.rerun()
+                st.session_state.active_event_code = ""; st.query_params.clear(); st.rerun()
 
-# --- 7. MAIN UI TABS ---
+# --- 7. MAIN UI ---
 if st.session_state.active_event_code:
-    this_event_history = history_df[history_df['event_code'] == st.session_state.active_event_code].copy()
-    this_event_players = players_df[players_df['event_code'] == st.session_state.active_event_code]['player_name'].tolist()
-    this_event_pods = active_pods_df[active_pods_df['event_code'] == st.session_state.active_event_code]
-    current_round = int(this_event_history['Round'].max() + 1) if not this_event_history.empty else 1
+    this_history = history_df[history_df['event_code'] == st.session_state.active_event_code].copy()
+    this_players = players_df[players_df['event_code'] == st.session_state.active_event_code]['player_name'].tolist()
+    this_pods = active_pods_df[active_pods_df['event_code'] == st.session_state.active_event_code]
+    curr_round = int(this_history['Round'].max() + 1) if not this_history.empty else 1
     
     st.title(f"🛡️ EDH Tournament: {st.session_state.active_event_code}")
     tab1, tab2, tab3 = st.tabs(["📊 Leaderboard", "⚔️ Active Pods", "📜 Match History"])
     
     with tab1:
-        if not this_event_history.empty:
-            this_event_history['Points'] = this_event_history['Points'].astype(int)
-            lb = this_event_history.groupby('Player').agg(Points=('Points', 'sum'), Wins=('Result', lambda x: (x == 'Winner').sum())).sort_values(by=['Points', 'Wins'], ascending=False)
+        if not this_history.empty:
+            lb = this_history.groupby('Player').agg(Points=('Points', 'sum'), Wins=('Result', lambda x: (x == 'Winner').sum())).sort_values(by=['Points', 'Wins'], ascending=False)
             st.dataframe(lb, use_container_width=True)
-        else: st.info("Waiting for Round 1 to finish.")
+        else: st.info("Waiting for Round 1.")
 
     with tab2:
-        if this_event_pods.empty:
+        if this_pods.empty:
             if is_admin:
-                st.subheader(f"Prepare Round {current_round}")
-                if st.button(f"Generate & Publish Round {current_round}", type="primary"):
-                    new_pods = split_into_swiss_pods(this_event_players, this_event_history)
-                    rows = []
-                    for i, pod in enumerate(new_pods):
-                        for p in pod: rows.append({"event_code": st.session_state.active_event_code, "Pod": i+1, "Player": p})
+                if st.button(f"Generate Round {curr_round}", type="primary"):
+                    new_pods = split_into_swiss_pods(this_players, this_history)
+                    rows = [{"event_code": st.session_state.active_event_code, "Pod": i+1, "Player": p} for i, pod in enumerate(new_pods) for p in pod]
                     conn.update(worksheet="CurrentPods", data=pd.concat([active_pods_df, pd.DataFrame(rows)], ignore_index=True))
                     st.cache_data.clear(); st.rerun()
-            else: st.info(f"Waiting for Admin to post Round {current_round}...")
+            else: st.info(f"Waiting for Admin to post Round {curr_round}...")
         else:
-            st.subheader(f"Active Pairings: Round {current_round}")
-            pod_ids = sorted(this_event_pods['Pod'].unique())
-            res_rows = []
-            ready = True
-            for pid in pod_ids:
-                members = this_event_pods[this_event_pods['Pod'] == pid]['Player'].tolist()
-                with st.expander(f"Pod {pid}: {', '.join(members)}", expanded=True):
+            res_rows = []; all_ready = True
+            for pid in sorted(this_pods['Pod'].unique()):
+                members = this_pods[this_pods['Pod'] == pid]['Player'].tolist()
+                with st.expander(f"Pod {int(pid)}: {', '.join(members)}", expanded=True):
                     if is_admin:
-                        win = st.selectbox("Select Winner", ["--"] + members, key=f"p{pid}")
-                        if win == "--": ready = False
+                        win = st.selectbox("Winner", ["--"] + members, key=f"p{pid}")
+                        if win == "--": all_ready = False
                         else:
-                            for p in members: res_rows.append({"event_code": st.session_state.active_event_code, "Round": current_round, "Pod": pid, "Player": p, "Points": 3 if p == win else 1, "Result": "Winner" if p == win else "Participant"})
+                            for p in members: res_rows.append({"event_code": st.session_state.active_event_code, "Round": curr_round, "Pod": pid, "Player": p, "Points": 3 if p == win else 1, "Result": "Winner" if p == win else "Participant"})
                     else:
                         for p in members: st.write(f"• {p}")
-            
-            if is_admin and st.button("Finalize Round", disabled=not ready, type="primary"):
+            if is_admin and st.button("Finalize Round", disabled=not all_ready, type="primary"):
                 conn.update(worksheet="MatchHistory", data=pd.concat([history_df, pd.DataFrame(res_rows)], ignore_index=True))
-                # Clear active pods for the next round
                 remaining = active_pods_df[active_pods_df['event_code'] != st.session_state.active_event_code]
                 conn.update(worksheet="CurrentPods", data=remaining)
                 st.cache_data.clear(); st.rerun()
 
     with tab3:
-        if not this_event_history.empty:
-            for r in sorted(this_event_history['Round'].unique(), reverse=True):
+        if not this_history.empty:
+            for r in sorted(this_history['Round'].unique(), reverse=True):
                 with st.expander(f"Round {int(r)}"):
-                    rd = this_event_history[this_event_history['Round'] == r]
+                    rd = this_history[this_history['Round'] == r]
                     for p_num in sorted(rd['Pod'].unique()):
                         p_data = rd[rd['Pod'] == p_num]
                         st.markdown(f"**Pod {int(p_num)}: {', '.join(p_data['Player'].tolist())}**")
                         st.table(p_data[["Player", "Result", "Points"]])
-        else: st.info("No games played yet.")
