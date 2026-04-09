@@ -1,18 +1,30 @@
 import streamlit as st
 import pandas as pd
 import random
+from streamlit_gsheets import GSheetsConnection
 
-# --- INITIALIZE SESSION STATE ---
-if 'players' not in st.session_state:
-    st.session_state.players = []
-if 'history' not in st.session_state:
-    st.session_state.history = []
-if 'current_round' not in st.session_state:
-    st.session_state.current_round = 0
-if 'current_pods' not in st.session_state:
-    st.session_state.current_pods = []
-if 'mode' not in st.session_state:
-    st.session_state.mode = "Casual"
+st.set_page_config(page_title="EDH Tournament Tracker", layout="wide")
+
+# --- CONNECT TO GOOGLE SHEETS ---
+conn = st.connection("gsheets", type=GSheetsConnection)
+
+# Helper function to get data safely
+def load_data(sheet_name):
+    return conn.read(worksheet=sheet_name, ttl="0") 
+
+# --- AUTH & EVENT LOGIC ---
+if not st.experimental_user.is_logged_in:
+    st.title("🛡️ EDH Tournament Portal")
+    st.info("Please log in to manage or join a tournament.")
+    st.button("Log in with Google", on_click=st.login)
+    st.stop()
+
+user_email = st.experimental_user.email
+event_code = st.sidebar.text_input("Event Code", placeholder="e.g., FNM_01")
+
+if not event_code:
+    st.warning("Enter an Event Code to continue.")
+    st.stop()
 
 st.set_page_config(page_title="EDH Tournament Tracker", layout="wide")
 
