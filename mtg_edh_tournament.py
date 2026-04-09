@@ -9,7 +9,6 @@ st.set_page_config(page_title="EDH Tournament Tracker", layout="wide")
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 def load_sheet(name, force_refresh=False):
-    # Cache results for 10 minutes unless force_refresh is True
     ttl = 0 if force_refresh else 600
     return conn.read(worksheet=name, ttl=ttl)
 
@@ -56,9 +55,12 @@ def create_event(admin_email):
     return new_code
 
 def drop_player(event_code, name):
-    df = load_sheet("Players", force_refresh=True)
-    updated = df[~((df['event_code'] == event_code) & (df['player_name'] == name))]
-    conn.update(worksheet="Players", data=updated)
+    try:
+        df = load_sheet("Players", force_refresh=True)
+        updated = df[~((df['event_code'] == event_code) & (df['player_name'] == name))]
+        conn.update(worksheet="Players", data=updated)
+    except Exception as e:
+        st.error(f"Drop failed: {e}")
 
 def split_into_swiss_pods(players, history_df):
     n = len(players)
@@ -101,13 +103,11 @@ def split_into_swiss_pods(players, history_df):
         pods.append(current_pod)
     return pods
 
-# --- 5. DATA SYNC (Optimized to prevent glitching) ---
+# --- 5. DATA SYNC (Silent mode) ---
 if st.session_state.active_event_code:
-    # Use standard cache for regular UI interactions
     hist_df = load_sheet("MatchHistory", force_refresh=False)
     event_history = hist_df[hist_df['event_code'] == st.session_state.active_event_code]
     
-    # Update round based on history only if we aren't currently in the middle of a pod session
     if not event_history.empty and not st.session_state.current_pods:
         st.session_state.current_round = int(event_history['Round'].max()) + 1
     elif event_history.empty and not st.session_state.current_pods:
@@ -238,16 +238,17 @@ if st.session_state.active_event_code:
                         for p, pts in pod_points.items(): results_data.append({"event_code": st.session_state.active_event_code, "Round": st.session_state.current_round, "Pod": pod_num, "Player": p, "Points": pts, "Result": "Winner" if pts == max_p and pts > 0 else "Participant"})
 
             if is_admin and st.button("Finalize and Upload Results", disabled=not all_reported):
-                hist = load_sheet("MatchHistory", force_refresh=True)
-                new_data_df = pd.DataFrame(results_data)
-                final_hist = pd.concat([hist, new_data_df], ignore_index=True)
-                conn.update(worksheet="MatchHistory", data=final_hist)
-                
-                # Clear cache so Round sync sees the new data
-                st.cache_data.clear()
-                st.session_state.current_pods = []
-                st.session_state.current_round += 1
-                st.rerun()
+                try:
+                    hist = load_sheet("MatchHistory", force_refresh=True)
+                    new_data_df = pd.DataFrame(results_data)
+                    final_hist = pd.concat([hist, new_data_df], ignore_index=True)
+                    conn.update(worksheet="MatchHistory", data=final_hist)
+                    st.cache_data.clear()
+                    st.session_state.current_pods = []
+                    st.session_state.current_round += 1
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Upload failed: {e}")
 
     with tab3:
         st.header("Match History")
