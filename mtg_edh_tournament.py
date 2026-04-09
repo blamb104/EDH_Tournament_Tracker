@@ -19,7 +19,7 @@ st.markdown("""
     }
     /* Main Landing Header styling */
     .landing-header {
-        font-size: 3rem;
+        font-size: 8rem;
         font-weight: 800;
         text-align: center;
         margin-bottom: 0px;
@@ -191,25 +191,18 @@ with st.sidebar:
 # --- 7. MAIN UI ---
 if not st.session_state.active_event_code:
     # --- LANDING PAGE ---
-    st.markdown('<p class="landing-header">🛡️ EDH Tracker</p>', unsafe_allow_html=True)
-    st.markdown('<p class="landing-subtitle">The Ultimate Commander Tournament Companion</p>', unsafe_allow_html=True)
+    st.markdown('<p class="landing-header">🛡️ EDH Tournament Tracker</p>', unsafe_allow_html=True)
     
     # Placeholder for your Logo
     # Replace the URL with your own custom logo URL (hosted on Imgur, GitHub, etc.)
-    logo_url = "https://cdn-icons-png.flaticon.com/512/3665/3665923.png" 
+    logo_url = "https://lh3.googleusercontent.com/d/1SUjz7NARD2glitJ-vwhsouepr0iJLPoZ" 
     
     left, mid, right = st.columns([1,2,1])
     with mid:
         st.image(logo_url, use_container_width=True)
-        st.info("💡 **Getting Started:** Enter an Event Code in the sidebar to view current pods and standings. Admins must log in to create or manage tournaments.")
-        
+        st.info("💡 **Getting Started:** Enter an Event Code in the sidebar to view current pods and standings. Admins must log in to create or manage tournaments.") 
     st.divider()
     
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Status", "System Online")
-    c2.metric("Active Events", len(events_df[events_df['status'] == 'Active']))
-    c3.metric("Total Match History", len(history_df['event_code'].unique()) if not history_df.empty else 0)
-
 else:
     # --- ACTIVE TOURNAMENT UI ---
     this_history = history_df[history_df['event_code'] == st.session_state.active_event_code].copy()
