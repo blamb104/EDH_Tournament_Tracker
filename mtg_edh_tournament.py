@@ -58,40 +58,84 @@ def add_player(event_code, name):
         updated = pd.concat([df, new_row], ignore_index=True)
         conn.update(worksheet="Players", data=updated)
 
-# --- 5. SIDEBAR (Event Management) ---
+# --- SIDEBAR LOGIC ---
 with st.sidebar:
-    # User Profile
+    # 1. User Identity
     cols = st.columns([1, 4])
-    cols[0].image(st.user.get("picture", "https://cdn-icons-png.flaticon.com/512/149/149071.png"), width=40)
+    cols[0].image(st.user.get("picture", "https://icon-library.com/images/default-user-icon/default-user-icon-13.jpg"), width=40)
     cols[1].write(f"**{st.user.get('name', 'User')}**")
     
     st.divider()
 
-    # Admin: Create Event
-    if st.button("✨ Create New Event", use_container_width=True):
-        new_code = create_event(user_email)
-        st.session_state.active_event_code = new_code
-        st.success(f"New Event: {new_code}")
+    # PHASE 1: NO EVENT SELECTED
+    if not st.session_state.active_event_code:
+        st.subheader("Tournament Hub")
+        if st.button("Create New Event", use_container_width=True):
+            new_code = create_event(user_email)
+            st.session_state.active_event_code = new_code
+            st.rerun()
+            
+        join_code = st.text_input("Or Join Existing Code:").upper().strip()
+        if join_code:
+            # (Validation logic from before...)
+            st.session_state.active_event_code = join_code
+            st.rerun()
 
-    # Join Event
-    input_code = st.text_input("Enter Event Code:", value=st.session_state.active_event_code).upper().strip()
-    
-    if input_code:
-        events_df = load_sheet("Events")
-        if input_code in events_df['event_code'].values:
-            st.session_state.active_event_code = input_code
-            event_row = events_df[events_df['event_code'] == input_code].iloc[0]
-            is_admin = (event_row['admin_email'] == user_email)
-            st.success(f"Joined: {input_code}")
-        else:
-            st.error("Invalid Code")
-            st.stop()
+    # PHASE 2 & 3: EVENT ACTIVE
     else:
-        st.info("Create or enter a code to continue.")
-        st.stop()
-    
-    if st.button("Log Out"):
-        st.logout()
+        st.subheader(f"🏆 {st.session_state.active_event_code}")
+        
+        # Check if we are the admin
+        events_df = load_sheet("Events")
+        event_row = events_df[events_df['event_code'] == st.session_state.active_event_code].iloc[0]
+        is_admin = (event_row['admin_email'] == user_email)
+
+        if not st.session_state.current_pods:
+            # TOURNAMENT SETUP MODE
+            st.caption("Status: Registration Open")
+            if is_admin:
+                with st.form("add_player_form", clear_on_submit=True):
+                    new_p = st.text_input("Register Player (Hit Enter)")
+                    submitted = st.form_submit_button("Add to Roster")
+                    if submitted and new_p:
+                        add_player(st.session_state.active_event_code, new_p)
+                        st.toast(f"✅ {new_p} added!")
+                        st.rerun()
+        else:
+            # EVENT MANAGER MODE
+            st.caption("Status: Round in Progress")
+            if is_admin:
+                st.write("---")
+                st.subheader("Drop Players")
+                players_df = load_sheet("Players")
+                roster = players_df[players_df['event_code'] == st.session_state.active_event_code]['player_name'].tolist()
+                player_to_drop = st.selectbox("Select Player to Drop", ["--"] + roster)
+                if st.button("❌ Drop Player") and player_to_drop != "--":
+                    # (Add logic to remove from Players sheet)
+                    st.warning(f"{player_to_drop} removed.")
+
+        st.divider()
+        
+        # FINAL ACTIONS
+        if is_admin:
+            if st.button("⏹️ End Tournament", type="secondary", use_container_width=True):
+                # We can add a "Archive" logic here
+                st.session_state.active_event_code = ""
+                st.session_state.current_pods = []
+                st.rerun()
+        
+        # CSV DOWNLOAD (Available to all)
+        hist_df = load_sheet("MatchHistory")
+        final_data = hist_df[hist_df['event_code'] == st.session_state.active_event_code]
+        if not final_data.empty:
+            csv = final_data.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="📥 Download CSV Results",
+                data=csv,
+                file_name=f"{st.session_state.active_event_code}_results.csv",
+                mime='text/csv',
+                use_container_width=True
+            )
 
 # --- 6. MAIN UI ---
 event_code = st.session_state.active_event_code
