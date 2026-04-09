@@ -64,18 +64,18 @@ def split_into_swiss_pods(players, history_df):
     if n < 3: return [players]
     
     scores = {p: 0 for p in players}
+    past_matchups = set()
+
     if not history_df.empty:
         s_map = history_df.groupby('Player')['Points'].sum().to_dict()
         for p in scores: scores[p] = s_map.get(p, 0)
-    
-    past_matchups = set()
-    if not history_df.empty:
-        # Check Pod and Round to find shared games
-        for (ev, rd, pd_num), group in history_df.groupby(['event_code', 'Round', 'Pod']):
-            members = group['Player'].tolist()
-            for i in range(len(members)):
-                for j in range(i + 1, len(members)):
-                    past_matchups.add(frozenset([members[i], members[j]]))
+        
+        if 'Pod' in history_df.columns:
+            for (_, rd, pd_num), group in history_df.groupby(['Round', 'Pod']):
+                members = group['Player'].tolist()
+                for i in range(len(members)):
+                    for j in range(i + 1, len(members)):
+                        past_matchups.add(frozenset([members[i], members[j]]))
 
     num_3s = 0
     if n % 4 == 1: num_3s = 3
@@ -102,10 +102,15 @@ def split_into_swiss_pods(players, history_df):
 
 # --- 5. DATA SYNC ---
 if st.session_state.active_event_code:
-    hist_df = load_sheet("MatchHistory")
+    # Force refresh to ensure we have the latest from the sheet
+    hist_df = load_sheet("MatchHistory", force_refresh=True)
+    # Filter ONLY for the current event code
     event_history = hist_df[hist_df['event_code'] == st.session_state.active_event_code]
+    
     if not event_history.empty and not st.session_state.current_pods:
         st.session_state.current_round = int(event_history['Round'].max()) + 1
+    elif event_history.empty:
+        st.session_state.current_round = 1
 else:
     event_history = pd.DataFrame()
 
@@ -127,6 +132,7 @@ with st.sidebar:
             if st.button("Create New Event", use_container_width=True):
                 new_code = create_event(user_email)
                 st.session_state.active_event_code = new_code
+                st.session_state.current_round = 1 # Reset round for new session
                 st.rerun()
         input_code = st.text_input("Enter Event Code:").upper().strip()
         if input_code:
@@ -178,7 +184,7 @@ with st.sidebar:
             st.cache_data.clear()
             st.rerun()
         if is_admin and st.button("End Tournament", type="secondary", use_container_width=True):
-            st.session_state.active_event_code = ""; st.session_state.current_pods = []; st.session_state.registration_list = []; st.rerun()
+            st.session_state.active_event_code = ""; st.session_state.current_pods = []; st.session_state.registration_list = []; st.session_state.current_round = 1; st.rerun()
 
 # --- 7. MAIN UI ---
 if st.session_state.active_event_code:
@@ -236,7 +242,13 @@ if st.session_state.active_event_code:
     with tab3:
         st.header("Match History")
         if not event_history.empty:
-            display_cols = ["Round", "Pod", "Player", "Result", "Points"]
-            st.dataframe(event_history[display_cols].sort_values(by=["Round", "Pod"]), use_container_width=True, hide_index=True)
+            display_cols = ["Round", "Player", "Result", "Points"]
+            if 'Pod' in event_history.columns:
+                display_cols.insert(1, "Pod")
+                sort_order = ["Round", "Pod"]
+            else:
+                sort_order = ["Round"]
+            
+            st.dataframe(event_history[display_cols].sort_values(by=sort_order), use_container_width=True, hide_index=True)
         else:
             st.info("No matches recorded yet.")
