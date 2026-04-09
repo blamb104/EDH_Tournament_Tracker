@@ -93,7 +93,12 @@ with st.sidebar:
     if not st.user.get("is_logged_in"):
         if st.button("Admin Login"): st.login()
     else:
-        st.write(f"Logged in: **{st.user.get('name')}**")
+        user_img = st.user.get("picture", "https://cdn-icons-png.flaticon.com/512/149/149071.png")
+        user_name = st.user.get("name", "Admin")
+        
+        cols = st.columns([1, 3])
+        cols[0].image(user_img, width=40)
+        cols[1].write(f"**{user_name}**")
         if st.button("Log Out"): st.logout()
     st.divider()
 
