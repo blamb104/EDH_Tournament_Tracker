@@ -95,7 +95,7 @@ with st.sidebar:
             st.caption("Status: Registration Open")
             if is_admin:
                 with st.form("add_player_form", clear_on_submit=True):
-                    new_p = st.text_input("Register Player (Hit Enter)")
+                    new_p = st.text_input("Register Player:")
                     submitted = st.form_submit_button("Add to Roster")
                     if submitted and new_p:
                         add_player(st.session_state.active_event_code, new_p)
@@ -103,7 +103,7 @@ with st.sidebar:
                         st.rerun()
         else:
             # EVENT MANAGER MODE
-            st.caption("Status: Round in Progress")
+            st.caption("Status: Round {st.session_state.current_round} in Progress")
             if is_admin:
                 st.write("---")
                 st.subheader("Drop Players")
@@ -118,7 +118,7 @@ with st.sidebar:
         
         # FINAL ACTIONS
         if is_admin:
-            if st.button("⏹️ End Tournament", type="secondary", use_container_width=True):
+            if st.button("End Tournament", type="secondary", use_container_width=True):
                 # We can add a "Archive" logic here
                 st.session_state.active_event_code = ""
                 st.session_state.current_pods = []
