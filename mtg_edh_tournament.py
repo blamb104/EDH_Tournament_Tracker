@@ -200,7 +200,7 @@ if not st.session_state.active_event_code:
     left, mid, right = st.columns([1,2,1])
     with mid:
         st.image(logo_url, use_container_width=True)
-        st.info("💡 **Getting Started:** Enter an Event Code in the sidebar to view current pods and standings. Admins must log in to create or manage tournaments.") 
+        st.info("💡 **Getting Started:** Enter an Event Code in the sidebar to view current pods and standings. The Tournament Admin must log in to create or manage tournaments.") 
     st.divider()
     
 else:
@@ -217,12 +217,12 @@ else:
         if not this_history.empty:
             lb = this_history.groupby('Player').agg(Points=('Points', 'sum'), Wins=('Result', lambda x: (x == 'Winner').sum())).sort_values(by=['Points', 'Wins'], ascending=False)
             st.dataframe(lb, use_container_width=True)
-        else: st.info("Waiting for Round 1 to finalize.")
+        else: st.info("Standings will appear here after Round 1 is finalized.")
 
     with tab2:
         if this_pods.empty:
             if is_event_admin:
-                st.subheader(f"Prepare Round {curr_round}")
+                st.subheader(f"Round {curr_round} Setup")
                 
                 # Check for minimum player count (6 players)
                 player_count = len(this_players)
@@ -240,7 +240,7 @@ else:
                         conn.update(worksheet="CurrentPods", data=pd.concat([active_pods_df, pd.DataFrame(rows)], ignore_index=True))
                         st.cache_data.clear(); st.rerun()
             else: 
-                st.info(f"Waiting for Admin to post Round {curr_round}...")
+                st.info(f"Waiting for Tournament Admin to post Round {curr_round}...")
         else:
             res_rows = []; all_ready = True
             for pid in sorted(this_pods['Pod'].unique()):
