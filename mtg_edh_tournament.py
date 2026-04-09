@@ -23,16 +23,16 @@ if not st.user.get("is_logged_in"):
 user_email = st.user.get("email")
 
 # --- 3. SESSION STATE ---
-states = {
-    'current_pods': [],
-    'active_event_code': "",
-    'current_round': 1,
-    'draft_roster': [],
-    'scoring_mode': "Casual"
-}
-for key, val in states.items():
-    if key not in st.session_state:
-        st.session_state[key] = val
+if 'current_pods' not in st.session_state:
+    st.session_state.current_pods = []
+if 'active_event_code' not in st.session_state:
+    st.session_state.active_event_code = ""
+if 'current_round' not in st.session_state:
+    st.session_state.current_round = 1
+if 'draft_roster' not in st.session_state:
+    st.session_state.draft_roster = []
+if 'scoring_mode' not in st.session_state:
+    st.session_state.scoring_mode = "Casual"
 
 # --- 4. HELPER FUNCTIONS ---
 def generate_unique_code():
@@ -53,20 +53,20 @@ def drop_player(event_code, name):
     updated = df[~((df['event_code'] == event_code) & (df['player_name'] == name))]
     conn.update(worksheet="Players", data=updated)
 
-# --- 5. DATA PERSISTENCE & ROUND TRACKING ---
-if st.session_state.active_event_code:
+# --- 5. DATA SYNC & INITIAL ROUND LOAD ---
+# This only runs when you first enter an event or hit "Sync"
+if st.session_state.active_event_code and len(st.session_state.current_pods) == 0:
     hist_df = load_sheet("MatchHistory")
     event_history = hist_df[hist_df['event_code'] == st.session_state.active_event_code]
     if not event_history.empty:
-        last_recorded_round = event_history['Round'].max()
-        if not st.session_state.current_pods:
-            st.session_state.current_round = int(last_recorded_round) + 1
-        else:
-            st.session_state.current_round = int(last_recorded_round)
+        # Sync the local round counter to whatever is in the sheet
+        st.session_state.current_round = int(event_history['Round'].max()) + 1
     else:
         st.session_state.current_round = 1
 else:
-    event_history = pd.DataFrame()
+    # Use existing history from cache if available
+    hist_df = load_sheet("MatchHistory")
+    event_history = hist_df[hist_df['event_code'] == st.session_state.active_event_code] if st.session_state.active_event_code else pd.DataFrame()
 
 # --- 6. SIDEBAR ---
 with st.sidebar:
@@ -87,8 +87,6 @@ with st.sidebar:
                 new_code = create_event(user_email)
                 st.session_state.active_event_code = new_code
                 st.rerun()
-        else:
-            st.warning("Host access required.")
         input_code = st.text_input("Enter Event Code:").upper().strip()
         if input_code:
             events_df = load_sheet("Events")
@@ -100,6 +98,7 @@ with st.sidebar:
         event_row = events_df[events_df['event_code'] == st.session_state.active_event_code].iloc[0]
         is_admin = (event_row['admin_email'] == user_email)
         st.subheader(f"Event: {st.session_state.active_event_code}")
+        
         has_started = not event_history.empty or len(st.session_state.current_pods) > 0
         if not has_started:
             st.caption("Status: Registration Open")
@@ -111,11 +110,6 @@ with st.sidebar:
                         if new_p not in st.session_state.draft_roster:
                             st.session_state.draft_roster.append(new_p)
                             st.rerun()
-                if st.session_state.draft_roster:
-                    st.write(f"Draft: {', '.join(st.session_state.draft_roster)}")
-                    if st.button("Clear Draft List"):
-                        st.session_state.draft_roster = []
-                        st.rerun()
         else:
             st.caption(f"Status: Round {st.session_state.current_round} ({st.session_state.scoring_mode})")
             if is_admin:
@@ -125,15 +119,11 @@ with st.sidebar:
                         p_df = load_sheet("Players", force_refresh=True)
                         conn.update(worksheet="Players", data=pd.concat([p_df, pd.DataFrame([{"event_code": st.session_state.active_event_code, "player_name": late_p}])], ignore_index=True))
                         st.rerun()
-                    p_df = load_sheet("Players")
-                    roster = p_df[p_df['event_code'] == st.session_state.active_event_code]['player_name'].tolist()
-                    p_to_drop = st.selectbox("Drop Player", ["--"] + roster)
-                    if st.button("Drop Selected Player") and p_to_drop != "--":
-                        drop_player(st.session_state.active_event_code, p_to_drop)
-                        st.rerun()
+
         st.divider()
         if st.button("Sync Data", use_container_width=True):
             st.cache_data.clear()
+            st.session_state.current_pods = [] # Force a re-fetch of round state
             st.rerun()
         if is_admin and st.button("End Tournament", type="secondary", use_container_width=True):
             st.session_state.active_event_code = ""; st.session_state.current_pods = []; st.session_state.draft_roster = []; st.rerun()
@@ -155,9 +145,7 @@ if st.session_state.active_event_code:
         full_roster = list(set(existing + st.session_state.draft_roster))
 
         if not st.session_state.current_pods:
-            st.subheader("Roster Preview")
-            st.write(f"Scoring: **{st.session_state.scoring_mode}**")
-            st.write(", ".join(full_roster) if full_roster else "Add players in the sidebar.")
+            st.subheader(f"Prepare Round {st.session_state.current_round}")
             if is_admin and len(full_roster) >= 4:
                 if st.button(f"Generate Round {st.session_state.current_round}", type="primary"):
                     if st.session_state.draft_roster:
@@ -190,8 +178,11 @@ if st.session_state.active_event_code:
             if is_admin and st.button("Finalize and Upload Results", disabled=not all_reported):
                 hist = load_sheet("MatchHistory", force_refresh=True)
                 conn.update(worksheet="MatchHistory", data=pd.concat([hist, pd.DataFrame(results_data)], ignore_index=True))
-                st.session_state.current_pods = []
-                load_sheet("MatchHistory", force_refresh=True)
+                
+                # --- LOCAL TRACKING UPDATES ---
+                st.session_state.current_pods = [] # Clear pods locally
+                st.session_state.current_round += 1 # Increment round locally
+                st.cache_data.clear() # Refresh leaderboard data
                 st.rerun()
 
     with tab3:
