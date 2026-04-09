@@ -112,7 +112,7 @@ with st.sidebar:
             if st.session_state.registration_list:
                 st.write(f"**Pending Registration ({len(st.session_state.registration_list)})**")
                 for p in st.session_state.registration_list:
-                    st.text(f"📝 {p}")
+                    st.text(f"{p}")
                 
                 if st.button("Confirm & Upload Roster", type="primary", use_container_width=True):
                     p_df = load_sheet("Players", force_refresh=True)
