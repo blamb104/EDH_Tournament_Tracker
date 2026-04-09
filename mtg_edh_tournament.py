@@ -124,7 +124,7 @@ def split_into_swiss_pods(players, history_df):
 
 # --- 6. SIDEBAR ---
 with st.sidebar:
-    st.title("Settings")
+    st.title("Event Settings")
     if st.user.get("is_logged_in"):
         user_img = st.user.get("picture", "https://cdn-icons-png.flaticon.com/512/149/149071.png")
         cols = st.columns([1, 3])
@@ -139,7 +139,7 @@ with st.sidebar:
     is_master_admin = user_email in auth_df['email'].str.lower().tolist() if user_email else False
 
     if not st.session_state.active_event_code:
-        input_code = st.text_input("Event Code Login:", placeholder="e.g. EDH-XJ49").upper().strip()
+        input_code = st.text_input("Event Code Login:", placeholder="e.g. EDH-MTG123").upper().strip()
         if st.button("Join Tournament", use_container_width=True):
             active_list = events_df[events_df['status'] == 'Active']['event_code'].values
             if input_code in active_list:
@@ -165,14 +165,14 @@ with st.sidebar:
 
         if is_event_admin:
             st.success("Admin Access")
-            with st.expander("Manage Roster"):
+            with st.expander("Add/Remove Players"):
                 with st.form("add_player", clear_on_submit=True):
                     name_in = st.text_input("Player Name")
                     if st.form_submit_button("Add"):
                         if name_in: st.session_state.registration_list.append(name_in.strip())
                 if st.session_state.registration_list:
                     for p in st.session_state.registration_list: st.text(f"• {p}")
-                    if st.button("Save to Sheet"):
+                    if st.button("Save Player List"):
                         new_reg = pd.DataFrame([{"event_code": st.session_state.active_event_code, "player_name": p} for p in st.session_state.registration_list])
                         conn.update(worksheet="Players", data=pd.concat([players_df, new_reg], ignore_index=True))
                         st.session_state.registration_list = []; st.cache_data.clear(); st.rerun()
@@ -200,7 +200,7 @@ if not st.session_state.active_event_code:
     left, mid, right = st.columns([1,2,1])
     with mid:
         st.image(logo_url, use_container_width=True)
-        st.info("💡 **Getting Started:** Enter an Event Code in the sidebar to view current pods and standings. The Tournament Admin must log in to create or manage tournaments.") 
+        st.info("💡 **Getting Started:** Enter an Event Code in the sidebar to view current pods and standings. The Tournament Admin must log in with Google to create or manage tournaments.") 
     st.divider()
     
 else:
