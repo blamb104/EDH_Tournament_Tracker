@@ -8,7 +8,7 @@ from streamlit_gsheets import GSheetsConnection
 st.set_page_config(page_title="EDH Tournament Tracker", layout="wide")
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# Custom CSS for UI buttons
+# Custom CSS for the End Tournament button (Primary style + Red)
 st.markdown("""
     <style>
     div[data-testid="stButton"] button:has(div:contains("End Tournament")) {
@@ -83,12 +83,15 @@ def split_into_swiss_pods(players, history_df):
                 for i in range(len(m)):
                     for j in range(i + 1, len(m)):
                         past_matchups.add(frozenset([m[i], m[j]]))
+
     num_3s = 0
     if n % 4 == 1: num_3s = 3
     elif n % 4 == 2: num_3s = 2
     elif n % 4 == 3: num_3s = 1
     pod_sizes = ([4] * ((n - (num_3s * 3)) // 4)) + ([3] * num_3s)
-    available = sorted(players, key=lambda x: scores[x], reverse=True)
+
+    # Strict Swiss sorting
+    available = sorted(players, key=lambda x: (scores[x], random.random()), reverse=True)
     pods = []
     for size in pod_sizes:
         current_pod = []
@@ -97,7 +100,8 @@ def split_into_swiss_pods(players, history_df):
         for _ in range(size - 1):
             best_match_idx = 0
             for idx, candidate in enumerate(available):
-                if not any(frozenset([candidate, p]) in past_matchups for p in current_pod):
+                already_played = any(frozenset([candidate, p]) in past_matchups for p in current_pod)
+                if not already_played or idx > 3: 
                     best_match_idx = idx
                     break
             current_pod.append(available.pop(best_match_idx))
@@ -109,7 +113,6 @@ if st.session_state.active_event_code:
     hist_df = load_sheet("MatchHistory", force_refresh=False)
     event_history = hist_df[hist_df['event_code'] == st.session_state.active_event_code].copy()
     if not event_history.empty:
-        # Format fix for points (ensure integer display)
         event_history['Points'] = event_history['Points'].astype(int)
         if not st.session_state.current_pods:
             st.session_state.current_round = int(event_history['Round'].max()) + 1
@@ -149,12 +152,12 @@ with st.sidebar:
         has_started = not event_history.empty or len(st.session_state.current_pods) > 0
         
         if not has_started:
-            with st.expander("ℹ️ Scoring Rules Guide", expanded=True):
-                st.markdown("**Casual Mode:** 3 pts Winner / 1 pt Player\n\n**Competitive:** Manual Entry (0-10)")
+            with st.expander("Scoring Rules Guide", expanded=True):
+                st.markdown("Casual: 3 pts Winner / 1 pt Player\n\nCompetitive: Manual Entry (0-10)")
                 if is_admin:
                     st.session_state.scoring_mode = st.radio("Select System:", ["Casual", "Competitive"])
         else:
-            st.info(f"Mode: **{st.session_state.scoring_mode}**")
+            st.info(f"Mode: {st.session_state.scoring_mode}")
 
         if is_admin:
             with st.expander("Manage Roster", expanded=not has_started):
@@ -185,8 +188,11 @@ with st.sidebar:
                     conn.update(worksheet="Players", data=updated)
                     st.cache_data.clear(); st.rerun()
 
+        # Sync is now Secondary
         if st.button("Sync Data", use_container_width=True, type="secondary"):
             st.cache_data.clear(); st.rerun()
+        
+        # End Tournament is now Primary (Red via CSS)
         if is_admin and st.button("End Tournament", use_container_width=True, type="primary"):
             st.session_state.active_event_code = ""; st.session_state.current_pods = []; st.session_state.current_round = 1; st.cache_data.clear(); st.rerun()
 
@@ -237,25 +243,18 @@ if st.session_state.active_event_code:
                 except Exception as e: st.error(f"Error: {e}")
     
     with tab3:
-        st.header("📜 Match History")
+        st.header("Match History")
         if not event_history.empty:
-            # Sort rounds chronologically (Round 1 at top)
             rounds = sorted(event_history['Round'].unique())
-            
             for r in rounds:
-                with st.expander(f"ROUND {int(r)}", expanded=(r == max(rounds))):
+                with st.expander(f"Round {int(r)}", expanded=(r == max(rounds))):
                     round_data = event_history[event_history['Round'] == r]
                     pods_in_round = sorted(round_data['Pod'].unique())
-                    
-                    # Create columns for pods or just list them vertically
                     for p_num in pods_in_round:
                         st.markdown(f"**Pod {int(p_num)}**")
                         pod_df = round_data[round_data['Pod'] == p_num][["Player", "Result", "Points"]]
                         st.table(pod_df)
                         st.divider()
-            
-            st.divider()
-            with st.expander("View All Match Data (Raw Table)"):
+            with st.expander("View All Match Data"):
                 st.dataframe(event_history.sort_values(by=["Round", "Pod"], ascending=[True, True]), use_container_width=True, hide_index=True)
-        else:
-            st.info("No matches have been played yet.")
+        else: st.info("No matches played.")
