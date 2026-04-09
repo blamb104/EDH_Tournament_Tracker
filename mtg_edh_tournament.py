@@ -9,7 +9,6 @@ st.set_page_config(page_title="EDH Tournament Tracker", layout="wide")
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 def load_sheet(name, force_refresh=False):
-    """Loads data with a 10-minute cache to prevent API Quota errors."""
     ttl = 0 if force_refresh else 600
     return conn.read(worksheet=name, ttl=ttl)
 
@@ -84,12 +83,21 @@ with st.sidebar:
     
     st.divider()
 
+    # AUTHORIZATION CHECK
+    auth_df = load_sheet("AuthorizedAdmins")
+    authorized_emails = auth_df['email'].str.lower().tolist() if not auth_df.empty else []
+    is_authorized = user_email.lower() in authorized_emails
+
     if not st.session_state.active_event_code:
         st.subheader("Tournament Hub")
-        if st.button("Create New Event", use_container_width=True):
-            new_code = create_event(user_email)
-            st.session_state.active_event_code = new_code
-            st.rerun()
+        
+        if is_authorized:
+            if st.button("Create New Event", use_container_width=True):
+                new_code = create_event(user_email)
+                st.session_state.active_event_code = new_code
+                st.rerun()
+        else:
+            st.warning("Host access required to create events.")
 
         input_code = st.text_input("Enter Event Code:").upper().strip()
         if input_code:
@@ -113,7 +121,7 @@ with st.sidebar:
             if is_admin:
                 st.session_state.scoring_mode = st.radio(
                     "Scoring System", ["Casual", "Competitive"],
-                    help="Casual: 3pts for Win, 1pt for Playing | Competitive: Manual Entry (5,3,2,1 default)"
+                    help="Casual: 3pts/1pt | Competitive: Manual Entry"
                 )
                 with st.form("add_player_form", clear_on_submit=True):
                     new_p = st.text_input("Draft Player")
@@ -124,7 +132,7 @@ with st.sidebar:
                             st.rerun()
                 
                 if st.session_state.draft_roster:
-                    st.write(f"Draft ({len(st.session_state.draft_roster)}): {', '.join(st.session_state.draft_roster)}")
+                    st.write(f"Draft: {', '.join(st.session_state.draft_roster)}")
                     if st.button("Clear Draft List"):
                         st.session_state.draft_roster = []
                         st.rerun()
@@ -159,7 +167,7 @@ with st.sidebar:
                 st.session_state.draft_roster = []
                 st.rerun()
 
-# --- 7. MAIN UI ---
+# --- 7. MAIN UI --- (Rest of code remains the same as previous)
 if st.session_state.active_event_code:
     st.title(f"Event: {st.session_state.active_event_code}")
     tab1, tab2, tab3 = st.tabs(["Leaderboard", "Active Pods", "History"])
@@ -215,27 +223,14 @@ if st.session_state.active_event_code:
                                     "Result": "Winner" if p == win else "Participant"
                                 })
                     else:
-                        # COMPETITIVE: MANUAL ENTRY (5, 3, 2, 1)
-                        st.write("Enter points for each player:")
+                        st.write("Enter points (5, 3, 2, 1):")
                         pod_points = {}
                         default_pts = [5, 3, 2, 1]
                         for idx, p in enumerate(pod):
-                            pod_points[p] = st.number_input(
-                                f"Points for {p}", 
-                                min_value=0, max_value=10, 
-                                value=default_pts[idx] if idx < len(default_pts) else 0, 
-                                key=f"pts_{i}_{p}"
-                            )
-                        
+                            pod_points[p] = st.number_input(f"Points for {p}", 0, 10, default_pts[idx] if idx < len(default_pts) else 0, key=f"pts_{i}_{p}")
                         max_p = max(pod_points.values())
                         for p, pts in pod_points.items():
-                            results_data.append({
-                                "event_code": st.session_state.active_event_code,
-                                "Round": st.session_state.current_round,
-                                "Player": p,
-                                "Points": pts,
-                                "Result": "Winner" if pts == max_p and pts > 0 else "Participant"
-                            })
+                            results_data.append({"event_code": st.session_state.active_event_code, "Round": st.session_state.current_round, "Player": p, "Points": pts, "Result": "Winner" if pts == max_p and pts > 0 else "Participant"})
 
             if is_admin and st.button("Finalize and Upload Results", disabled=not all_reported):
                 hist = load_sheet("MatchHistory", force_refresh=True)
