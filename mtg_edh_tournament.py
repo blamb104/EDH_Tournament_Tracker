@@ -141,10 +141,8 @@ with st.sidebar:
         st.subheader(f"Event: {st.session_state.active_event_code}")
         has_started = not event_history.empty or len(st.session_state.current_pods) > 0
         
-        # --- PERMANENT ADMIN CONTROLS ---
         if is_admin:
             with st.expander("Manage Roster", expanded=not has_started):
-                # Registration (Only before start)
                 if not has_started:
                     st.session_state.scoring_mode = st.radio("Scoring System", ["Casual", "Competitive"])
                     with st.form("player_entry_form", clear_on_submit=True):
@@ -160,7 +158,6 @@ with st.sidebar:
                             st.session_state.registration_list = []
                             st.rerun()
 
-                # Add Late / Drop (Always available)
                 st.divider()
                 late_p = st.text_input("Add Late Player")
                 if st.button("Add Late"):
@@ -226,7 +223,10 @@ if st.session_state.active_event_code:
 
             if is_admin and st.button("Finalize and Upload Results", disabled=not all_reported):
                 hist = load_sheet("MatchHistory", force_refresh=True)
-                conn.update(worksheet="MatchHistory", data=pd.concat([hist, pd.DataFrame(results_data)], ignore_index=True))
+                # Filter columns before saving to Google Sheets
+                new_data_df = pd.DataFrame(results_data)
+                final_hist = pd.concat([hist, new_data_df], ignore_index=True)
+                conn.update(worksheet="MatchHistory", data=final_hist)
                 st.session_state.current_pods = []
                 st.session_state.current_round += 1
                 st.cache_data.clear() 
@@ -234,4 +234,9 @@ if st.session_state.active_event_code:
 
     with tab3:
         st.header("Match History")
-        st.dataframe(event_history, use_container_width=True)
+        if not event_history.empty:
+            # Only show relevant columns in the app preview
+            display_cols = ["Round", "Player", "Result", "Points"]
+            st.dataframe(event_history[display_cols], use_container_width=True, hide_index=True)
+        else:
+            st.info("No matches recorded yet.")
