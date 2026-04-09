@@ -89,7 +89,7 @@ def split_into_swiss_pods(players, history_df):
 
 # --- 6. SIDEBAR CONTROLS ---
 with st.sidebar:
-    st.title("Settings")
+    st.title("Event Settings")
     if not st.user.get("is_logged_in"):
         if st.button("Admin Login"): st.login()
     else:
