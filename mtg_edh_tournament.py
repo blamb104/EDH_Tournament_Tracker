@@ -54,18 +54,20 @@ def create_event(admin_email):
     conn.update(worksheet="Events", data=pd.concat([df, new_event], ignore_index=True))
     return new_code
 
+def drop_player(event_code, name):
+    df = load_sheet("Players", force_refresh=True)
+    updated = df[~((df['event_code'] == event_code) & (df['player_name'] == name))]
+    conn.update(worksheet="Players", data=updated)
+
 def split_into_swiss_pods(players, history_df):
-    """Swiss pairings: group by score, maximize 4-man pods, avoid 2-man pods and repeats."""
     n = len(players)
     if n < 3: return [players]
     
-    # Calculate scores
     scores = {p: 0 for p in players}
     if not history_df.empty:
         s_map = history_df.groupby('Player')['Points'].sum().to_dict()
         for p in scores: scores[p] = s_map.get(p, 0)
     
-    # Track past matchups
     past_matchups = set()
     if not history_df.empty:
         for (ev, rd), group in history_df.groupby(['event_code', 'Round']):
@@ -74,26 +76,21 @@ def split_into_swiss_pods(players, history_df):
                 for j in range(i + 1, len(pod_members)):
                     past_matchups.add(frozenset([pod_members[i], pod_members[j]]))
 
-    # Determine pod sizes (Logic to avoid 2s)
     num_3s = 0
     if n % 4 == 1: num_3s = 3
     elif n % 4 == 2: num_3s = 2
     elif n % 4 == 3: num_3s = 1
     
     pod_sizes = ([4] * ((n - (num_3s * 3)) // 4)) + ([3] * num_3s)
-    
-    # Sort players by score (High to Low)
     available = sorted(players, key=lambda x: scores[x], reverse=True)
     pods = []
 
     for size in pod_sizes:
         current_pod = []
-        anchor = available.pop(0) # Take highest score
+        anchor = available.pop(0)
         current_pod.append(anchor)
-        
         for _ in range(size - 1):
             best_match_idx = 0
-            # Look for someone with similar score who hasn't played with current_pod
             for idx, candidate in enumerate(available):
                 if not any(frozenset([candidate, p]) in past_matchups for p in current_pod):
                     best_match_idx = idx
@@ -102,7 +99,7 @@ def split_into_swiss_pods(players, history_df):
         pods.append(current_pod)
     return pods
 
-# --- 5. ROUND TRACKING ---
+# --- 5. DATA SYNC ---
 if st.session_state.active_event_code:
     hist_df = load_sheet("MatchHistory")
     event_history = hist_df[hist_df['event_code'] == st.session_state.active_event_code]
@@ -144,21 +141,38 @@ with st.sidebar:
         st.subheader(f"Event: {st.session_state.active_event_code}")
         has_started = not event_history.empty or len(st.session_state.current_pods) > 0
         
-        if not has_started and is_admin:
-            st.session_state.scoring_mode = st.radio("Scoring System", ["Casual", "Competitive"], help="Casual: 3 pts win, 1 pt play. Competitive: Manual entry.")
-            st.write("### Player Entry")
-            with st.form("player_entry_form", clear_on_submit=True):
-                st.text_input("Enter Player Name", key="player_input_field")
-                st.form_submit_button("Register Player", on_click=add_player_callback)
-            
-            if st.session_state.registration_list:
-                st.write(f"Pending Registration: {len(st.session_state.registration_list)}")
-                for p in st.session_state.registration_list: st.text(f"- {p}")
-                if st.button("Confirm and Upload Roster", type="primary", use_container_width=True):
+        # --- PERMANENT ADMIN CONTROLS ---
+        if is_admin:
+            with st.expander("Manage Roster", expanded=not has_started):
+                # Registration (Only before start)
+                if not has_started:
+                    st.session_state.scoring_mode = st.radio("Scoring System", ["Casual", "Competitive"])
+                    with st.form("player_entry_form", clear_on_submit=True):
+                        st.text_input("Enter Player Name", key="player_input_field")
+                        st.form_submit_button("Register Player", on_click=add_player_callback)
+                    
+                    if st.session_state.registration_list:
+                        st.write(f"Pending: {len(st.session_state.registration_list)}")
+                        if st.button("Confirm and Upload Roster", type="primary"):
+                            p_df = load_sheet("Players", force_refresh=True)
+                            new_rows = pd.DataFrame([{"event_code": st.session_state.active_event_code, "player_name": p} for p in st.session_state.registration_list])
+                            conn.update(worksheet="Players", data=pd.concat([p_df, new_rows], ignore_index=True))
+                            st.session_state.registration_list = []
+                            st.rerun()
+
+                # Add Late / Drop (Always available)
+                st.divider()
+                late_p = st.text_input("Add Late Player")
+                if st.button("Add Late"):
                     p_df = load_sheet("Players", force_refresh=True)
-                    new_rows = pd.DataFrame([{"event_code": st.session_state.active_event_code, "player_name": p} for p in st.session_state.registration_list])
-                    conn.update(worksheet="Players", data=pd.concat([p_df, new_rows], ignore_index=True))
-                    st.session_state.registration_list = []
+                    conn.update(worksheet="Players", data=pd.concat([p_df, pd.DataFrame([{"event_code": st.session_state.active_event_code, "player_name": late_p}])], ignore_index=True))
+                    st.rerun()
+                
+                p_df = load_sheet("Players")
+                confirmed_list = p_df[p_df['event_code'] == st.session_state.active_event_code]['player_name'].tolist()
+                drop_p = st.selectbox("Drop Player", ["-- Select --"] + confirmed_list)
+                if st.button("Confirm Drop") and drop_p != "-- Select --":
+                    drop_player(st.session_state.active_event_code, drop_p)
                     st.rerun()
 
         st.divider()
@@ -197,7 +211,7 @@ if st.session_state.active_event_code:
             results_data = []
             all_reported = True
             for i, pod in enumerate(st.session_state.current_pods):
-                with st.expander(f"Pod {i+1}: {', '.join(pod)}", expanded=True):
+                with st.expander(f"Pod {i+1} ({len(pod)}): {', '.join(pod)}", expanded=True):
                     if st.session_state.scoring_mode == "Casual":
                         win = st.selectbox("Winner", ["Select..."] + pod, key=f"win_{i}")
                         if win == "Select...": all_reported = False
