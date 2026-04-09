@@ -210,7 +210,8 @@ else:
     this_pods = active_pods_df[active_pods_df['event_code'] == st.session_state.active_event_code]
     curr_round = int(this_history['Round'].max() + 1) if not this_history.empty else 1
     
-    st.title(f"🛡️ Event Code: {st.session_state.active_event_code}")
+    st.markdown('<p class="landing-header">🛡️ EDH Tournament Tracker</p>', unsafe_allow_html=True)
+    st.title(f"Event Code: {st.session_state.active_event_code}")
     tab1, tab2, tab3 = st.tabs(["🏆 Leaderboard", "⚔️ Active Pods", "📜 Match History"])
     
     with tab1:
@@ -234,7 +235,7 @@ else:
                         st.rerun()
                 else:
                     st.success(f"Ready to start! {player_count} players registered.")
-                    if st.button(f"Generate Round {curr_round}", use_container_width=True):
+                    if st.button(f"Generate Round {curr_round}"):
                         new_pods = split_into_swiss_pods(this_players, this_history)
                         rows = [{"event_code": st.session_state.active_event_code, "Pod": i+1, "Player": p} for i, pod in enumerate(new_pods) for p in pod]
                         conn.update(worksheet="CurrentPods", data=pd.concat([active_pods_df, pd.DataFrame(rows)], ignore_index=True))
