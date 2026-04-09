@@ -28,6 +28,19 @@ if 'current_round' not in st.session_state:
 
 # --- 4. SIDEBAR & EVENT SETUP ---
 with st.sidebar:
+    st.markdown("---")
+    cols = st.columns([1, 4])
+    # Show user's profile picture if available, else a generic icon
+    with cols[0]:
+        st.image(st.user.get("picture", "https://cdn-icons-png.flaticon.com/512/149/149071.png"), width=40)
+    with cols[1]:
+        st.write(f"**{st.user.get('name', 'User')}**")
+        st.caption(user_email)
+    
+    # Add a logout button for convenience
+    if st.button("Log Out", use_container_width=True):
+        st.logout()
+    st.markdown("---")
     st.title("Tournament Setup")
     event_code = st.text_input("Event Code", placeholder="e.g. FNM_MARCH")
     mode = st.radio("Tournament Mode", ["Casual", "Competitive"])
