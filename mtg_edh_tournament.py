@@ -243,7 +243,7 @@ if st.session_state.active_event_code:
             rounds = sorted(event_history['Round'].unique())
             
             for r in rounds:
-                with st.expander(f"🏅 ROUND {int(r)}", expanded=(r == max(rounds))):
+                with st.expander(f"ROUND {int(r)}", expanded=(r == max(rounds))):
                     round_data = event_history[event_history['Round'] == r]
                     pods_in_round = sorted(round_data['Pod'].unique())
                     
@@ -255,7 +255,7 @@ if st.session_state.active_event_code:
                         st.divider()
             
             st.divider()
-            with st.expander("🔍 View All Match Data (Raw Table)"):
+            with st.expander("View All Match Data (Raw Table)"):
                 st.dataframe(event_history.sort_values(by=["Round", "Pod"], ascending=[True, True]), use_container_width=True, hide_index=True)
         else:
             st.info("No matches have been played yet.")
