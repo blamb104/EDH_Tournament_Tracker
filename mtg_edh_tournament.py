@@ -70,11 +70,12 @@ def split_into_swiss_pods(players, history_df):
     
     past_matchups = set()
     if not history_df.empty:
-        for (ev, rd), group in history_df.groupby(['event_code', 'Round']):
-            pod_members = group['Player'].tolist()
-            for i in range(len(pod_members)):
-                for j in range(i + 1, len(pod_members)):
-                    past_matchups.add(frozenset([pod_members[i], pod_members[j]]))
+        # Check Pod and Round to find shared games
+        for (ev, rd, pd_num), group in history_df.groupby(['event_code', 'Round', 'Pod']):
+            members = group['Player'].tolist()
+            for i in range(len(members)):
+                for j in range(i + 1, len(members)):
+                    past_matchups.add(frozenset([members[i], members[j]]))
 
     num_3s = 0
     if n % 4 == 1: num_3s = 3
@@ -208,22 +209,22 @@ if st.session_state.active_event_code:
             results_data = []
             all_reported = True
             for i, pod in enumerate(st.session_state.current_pods):
-                with st.expander(f"Pod {i+1} ({len(pod)}): {', '.join(pod)}", expanded=True):
+                pod_num = i + 1
+                with st.expander(f"Pod {pod_num} ({len(pod)}): {', '.join(pod)}", expanded=True):
                     if st.session_state.scoring_mode == "Casual":
                         win = st.selectbox("Winner", ["Select..."] + pod, key=f"win_{i}")
                         if win == "Select...": all_reported = False
                         else:
-                            for p in pod: results_data.append({"event_code": st.session_state.active_event_code, "Round": st.session_state.current_round, "Player": p, "Points": 3 if p == win else 1, "Result": "Winner" if p == win else "Participant"})
+                            for p in pod: results_data.append({"event_code": st.session_state.active_event_code, "Round": st.session_state.current_round, "Pod": pod_num, "Player": p, "Points": 3 if p == win else 1, "Result": "Winner" if p == win else "Participant"})
                     else:
                         st.write("Points Entry:")
                         pod_points = {}
                         for p in pod: pod_points[p] = st.number_input(f"Points for {p}", 0, 10, 0, key=f"pts_{i}_{p}")
                         max_p = max(pod_points.values())
-                        for p, pts in pod_points.items(): results_data.append({"event_code": st.session_state.active_event_code, "Round": st.session_state.current_round, "Player": p, "Points": pts, "Result": "Winner" if pts == max_p and pts > 0 else "Participant"})
+                        for p, pts in pod_points.items(): results_data.append({"event_code": st.session_state.active_event_code, "Round": st.session_state.current_round, "Pod": pod_num, "Player": p, "Points": pts, "Result": "Winner" if pts == max_p and pts > 0 else "Participant"})
 
             if is_admin and st.button("Finalize and Upload Results", disabled=not all_reported):
                 hist = load_sheet("MatchHistory", force_refresh=True)
-                # Filter columns before saving to Google Sheets
                 new_data_df = pd.DataFrame(results_data)
                 final_hist = pd.concat([hist, new_data_df], ignore_index=True)
                 conn.update(worksheet="MatchHistory", data=final_hist)
@@ -235,8 +236,7 @@ if st.session_state.active_event_code:
     with tab3:
         st.header("Match History")
         if not event_history.empty:
-            # Only show relevant columns in the app preview
-            display_cols = ["Round", "Player", "Result", "Points"]
-            st.dataframe(event_history[display_cols], use_container_width=True, hide_index=True)
+            display_cols = ["Round", "Pod", "Player", "Result", "Points"]
+            st.dataframe(event_history[display_cols].sort_values(by=["Round", "Pod"]), use_container_width=True, hide_index=True)
         else:
             st.info("No matches recorded yet.")
