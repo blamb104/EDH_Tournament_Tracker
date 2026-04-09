@@ -165,7 +165,6 @@ with st.sidebar:
                         st.text_input("Enter Player Name", key="player_input_field")
                         st.form_submit_button("Register Player", on_click=add_player_callback)
                     
-                    # Show the temporary list here
                     if st.session_state.registration_list:
                         st.write("**Pending Registration:**")
                         for p in st.session_state.registration_list:
@@ -194,11 +193,11 @@ with st.sidebar:
                         conn.update(worksheet="Players", data=updated)
                         st.cache_data.clear(); st.rerun()
 
-        if is_admin and st.button("Sync Data", use_container_width=True, type="secondary"):
-            st.cache_data.clear(); st.rerun()
-        
-        if is_admin and st.button("End Tournament", use_container_width=True, type="primary"):
-            st.session_state.active_event_code = ""; st.session_state.current_pods = []; st.session_state.current_round = 1; st.cache_data.clear(); st.rerun()
+            if st.button("Sync Data", use_container_width=True, type="secondary"):
+                st.cache_data.clear(); st.rerun()
+            
+            if st.button("End Tournament", use_container_width=True, type="primary"):
+                st.session_state.active_event_code = ""; st.session_state.current_pods = []; st.session_state.current_round = 1; st.cache_data.clear(); st.rerun()
 
 # --- 7. MAIN UI ---
 if st.session_state.active_event_code:
@@ -214,30 +213,44 @@ if st.session_state.active_event_code:
     with tab2:
         p_df = load_sheet("Players")
         confirmed = p_df[p_df['event_code'] == st.session_state.active_event_code]['player_name'].tolist()
+        
         if not st.session_state.current_pods:
-            st.subheader(f"Prepare Round {st.session_state.current_round}")
+            st.subheader(f"Round {st.session_state.current_round}")
             if is_admin:
                 if len(confirmed) >= 3:
+                    st.write(f"Total Players Registered: {len(confirmed)}")
                     if st.button(f"Generate Round {st.session_state.current_round}", type="primary"):
                         st.session_state.current_pods = split_into_swiss_pods(confirmed, event_history)
                         st.rerun()
-                else: st.warning("Need 3+ players.")
+                else: st.warning("Need 3+ players to start.")
+            else:
+                st.info("Waiting for admin to generate the next round.")
+                if confirmed:
+                    st.write("**Current Roster:**")
+                    st.write(", ".join(confirmed))
         else:
-            st.subheader(f"Reporting Round {st.session_state.current_round}")
+            st.subheader(f"Active Pairings: Round {st.session_state.current_round}")
             results_data = []
             all_reported = True
+            
             for i, pod in enumerate(st.session_state.current_pods):
                 pod_num = i + 1
-                with st.expander(f"Pod {pod_num}: {', '.join(pod)}", expanded=True):
-                    if st.session_state.scoring_mode == "Casual":
-                        win = st.selectbox("Winner", ["Select..."] + pod, key=f"win_{i}")
-                        if win == "Select...": all_reported = False
+                with st.expander(f"Pod {pod_num}", expanded=True):
+                    if is_admin:
+                        # Admin View: Reporting Controls
+                        if st.session_state.scoring_mode == "Casual":
+                            win = st.selectbox("Winner", ["Select..."] + pod, key=f"win_{i}")
+                            if win == "Select...": all_reported = False
+                            else:
+                                for p in pod: results_data.append({"event_code": st.session_state.active_event_code, "Round": st.session_state.current_round, "Pod": pod_num, "Player": p, "Points": 3 if p == win else 1, "Result": "Winner" if p == win else "Participant"})
                         else:
-                            for p in pod: results_data.append({"event_code": st.session_state.active_event_code, "Round": st.session_state.current_round, "Pod": pod_num, "Player": p, "Points": 3 if p == win else 1, "Result": "Winner" if p == win else "Participant"})
+                            pod_points = {p: st.number_input(f"Pts {p}", 0, 10, 0, key=f"pts_{i}_{p}") for p in pod}
+                            max_p = max(pod_points.values())
+                            for p, pts in pod_points.items(): results_data.append({"event_code": st.session_state.active_event_code, "Round": st.session_state.current_round, "Pod": pod_num, "Player": p, "Points": pts, "Result": "Winner" if pts == max_p and pts > 0 else "Participant"})
                     else:
-                        pod_points = {p: st.number_input(f"Pts {p}", 0, 10, 0, key=f"pts_{i}_{p}") for p in pod}
-                        max_p = max(pod_points.values())
-                        for p, pts in pod_points.items(): results_data.append({"event_code": st.session_state.active_event_code, "Round": st.session_state.current_round, "Pod": pod_num, "Player": p, "Points": pts, "Result": "Winner" if pts == max_p and pts > 0 else "Participant"})
+                        # Player View: Simple list of pairings
+                        st.write(" • " + "\n • ".join(pod))
+            
             if is_admin and st.button("Finalize Round", disabled=not all_reported, type="primary"):
                 try:
                     hist = load_sheet("MatchHistory", force_refresh=True)
