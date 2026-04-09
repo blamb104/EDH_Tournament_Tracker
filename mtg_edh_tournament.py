@@ -27,7 +27,7 @@ states = {
     'current_pods': [],
     'active_event_code': "",
     'current_round': 1,
-    'registration_list': [], # Renamed from draft_roster
+    'registration_list': [],
     'scoring_mode': "Casual"
 }
 for key, val in states.items():
@@ -54,7 +54,44 @@ def create_event(admin_email):
     conn.update(worksheet="Events", data=pd.concat([df, new_event], ignore_index=True))
     return new_code
 
-# --- 5. ROUND TRACKING LOGIC ---
+def split_into_pods(players):
+    """Logic to ensure only 3 or 4 person pods, maximizing 4s."""
+    n = len(players)
+    if n < 3: return [players] # Not enough for a legal pod
+    
+    pods = []
+    # Calculate number of 3-person pods needed to avoid remainders of 1 or 2
+    num_3s = 0
+    if n % 4 == 1: num_3s = 3 # e.g., 9 players = 3, 3, 3
+    elif n % 4 == 2: num_3s = 2 # e.g., 14 players = 4, 4, 3, 3
+    elif n % 4 == 3: num_3s = 1 # e.g., 7 players = 4, 3
+    
+    # Check if we have enough players to support the required 3-person pods
+    if n < (num_3s * 3):
+        # Fallback for very small groups (like 5 or 6)
+        # 5 -> 3, 2 (unavoidable) | 6 -> 3, 3
+        num_3s = n // 3
+        
+    temp_players = players.copy()
+    random.shuffle(temp_players)
+    
+    # Extract 3-person pods first
+    for _ in range(num_3s):
+        if len(temp_players) >= 3:
+            pods.append([temp_players.pop() for _ in range(3)])
+            
+    # Fill remaining players into 4-person pods
+    while len(temp_players) >= 4:
+        pods.append([temp_players.pop() for _ in range(4)])
+        
+    # Any leftovers (should only happen if n < 3)
+    if temp_players:
+        if pods: pods[-1].extend(temp_players)
+        else: pods.append(temp_players)
+        
+    return pods
+
+# --- 5. ROUND TRACKING ---
 if st.session_state.active_event_code:
     hist_df = load_sheet("MatchHistory")
     event_history = hist_df[hist_df['event_code'] == st.session_state.active_event_code]
@@ -94,35 +131,22 @@ with st.sidebar:
         is_admin = (event_row['admin_email'] == user_email)
         
         st.subheader(f"Event: {st.session_state.active_event_code}")
-        
-        # --- PLAYER REGISTRATION (ADMIN ONLY) ---
         has_started = not event_history.empty or len(st.session_state.current_pods) > 0
+        
         if not has_started and is_admin:
-            st.session_state.scoring_mode = st.radio(
-                "Scoring System", ["Casual", "Competitive"],
-                help="**Casual**: 3 pts Win / 1 pt Play.\n**Competitive**: Manual (5,3,2,1 default)."
-            )
-            
+            st.session_state.scoring_mode = st.radio("Scoring System", ["Casual", "Competitive"], help="Casual: 3/1 split. Competitive: Manual entry.")
             st.write("### Player Entry")
             with st.form("player_entry_form", clear_on_submit=True):
                 st.text_input("Enter Player Name", key="player_input_field")
                 st.form_submit_button("Register Player", on_click=add_player_callback)
             
-            # SIDEBAR PREVIEW & SYNC
             if st.session_state.registration_list:
                 st.write(f"**Pending Registration ({len(st.session_state.registration_list)})**")
-                for p in st.session_state.registration_list:
-                    st.text(f"{p}")
-                
+                for p in st.session_state.registration_list: st.text(f"📝 {p}")
                 if st.button("Confirm & Upload Roster", type="primary", use_container_width=True):
                     p_df = load_sheet("Players", force_refresh=True)
                     new_rows = pd.DataFrame([{"event_code": st.session_state.active_event_code, "player_name": p} for p in st.session_state.registration_list])
                     conn.update(worksheet="Players", data=pd.concat([p_df, new_rows], ignore_index=True))
-                    st.session_state.registration_list = [] # Clear local list after upload
-                    st.success("Roster synced to Google Sheets!")
-                    st.rerun()
-                
-                if st.button("Clear Pending List"):
                     st.session_state.registration_list = []
                     st.rerun()
 
@@ -146,38 +170,33 @@ if st.session_state.active_event_code:
 
     with tab2:
         p_df = load_sheet("Players")
-        # Only players already in the Google Sheet are "Confirmed"
         confirmed_players = p_df[p_df['event_code'] == st.session_state.active_event_code]['player_name'].tolist()
 
         if not st.session_state.current_pods:
             st.subheader(f"Prepare Round {st.session_state.current_round}")
             st.write(f"Confirmed Roster: **{len(confirmed_players)} players**")
-            
             if is_admin:
-                if len(confirmed_players) >= 4:
+                if len(confirmed_players) >= 3:
                     if st.button(f"Generate Pairings for Round {st.session_state.current_round}", type="primary"):
-                        random.shuffle(confirmed_players)
-                        st.session_state.current_pods = [confirmed_players[i:i+4] for i in range(0, len(confirmed_players), 4)]
+                        st.session_state.current_pods = split_into_pods(confirmed_players)
                         st.rerun()
-                else:
-                    st.warning("You need at least 4 confirmed players in the Google Sheet to start.")
+                else: st.warning("Need at least 3 players.")
         else:
             st.subheader(f"Reporting Round {st.session_state.current_round}")
             results_data = []
             all_reported = True
             for i, pod in enumerate(st.session_state.current_pods):
-                with st.expander(f"Pod {i+1}: {', '.join(pod)}", expanded=True):
+                pod_label = f"Pod {i+1} ({len(pod)} players): {', '.join(pod)}"
+                with st.expander(pod_label, expanded=True):
                     if st.session_state.scoring_mode == "Casual":
                         win = st.selectbox("Winner", ["Select..."] + pod, key=f"win_{i}")
                         if win == "Select...": all_reported = False
                         else:
                             for p in pod: results_data.append({"event_code": st.session_state.active_event_code, "Round": st.session_state.current_round, "Player": p, "Points": 3 if p == win else 1, "Result": "Winner" if p == win else "Participant"})
                     else:
-                        st.write("Enter points (5, 3, 2, 1):")
+                        st.write("Manual Points Entry:")
                         pod_points = {}
-                        default_pts = [5, 3, 2, 1]
-                        for idx, p in enumerate(pod):
-                            pod_points[p] = st.number_input(f"Points for {p}", 0, 10, default_pts[idx] if idx < len(default_pts) else 0, key=f"pts_{i}_{p}")
+                        for p in pod: pod_points[p] = st.number_input(f"Points for {p}", 0, 10, 0, key=f"pts_{i}_{p}")
                         max_p = max(pod_points.values())
                         for p, pts in pod_points.items(): results_data.append({"event_code": st.session_state.active_event_code, "Round": st.session_state.current_round, "Player": p, "Points": pts, "Result": "Winner" if pts == max_p and pts > 0 else "Participant"})
 
