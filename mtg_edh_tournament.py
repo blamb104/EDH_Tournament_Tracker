@@ -140,7 +140,7 @@ with st.sidebar:
 
     if not st.session_state.active_event_code:
         input_code = st.text_input("Event Code Login:", placeholder="e.g. EDH-XJ49").upper().strip()
-        if st.button("Join Tournament View", use_container_width=True):
+        if st.button("Join Tournament", use_container_width=True):
             active_list = events_df[events_df['status'] == 'Active']['event_code'].values
             if input_code in active_list:
                 st.session_state.active_event_code = input_code
@@ -160,7 +160,7 @@ with st.sidebar:
         is_event_admin = (user_email == event_row['admin_email'].lower()) if user_email else False
         st.subheader(f"Code: {st.session_state.active_event_code}")
         
-        if st.button("Refresh Data 🔄", use_container_width=True):
+        if st.button("Refresh Data", use_container_width=True):
             st.cache_data.clear(); st.rerun()
 
         if is_event_admin:
