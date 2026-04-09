@@ -140,7 +140,7 @@ with st.sidebar:
 
     if not st.session_state.active_event_code:
         input_code = st.text_input("Event Code Login:", placeholder="e.g. EDH-XJ49").upper().strip()
-        if st.button("Join Tournament View", use_container_width=True, type="primary"):
+        if st.button("Join Tournament View", use_container_width=True):
             active_list = events_df[events_df['status'] == 'Active']['event_code'].values
             if input_code in active_list:
                 st.session_state.active_event_code = input_code
@@ -150,7 +150,7 @@ with st.sidebar:
         
         if is_master_admin:
             st.write("---")
-            if st.button("Create New Tournament", use_container_width=True):
+            if st.button("Create New Tournament", use_container_width=True, type="primary"):
                 st.session_state.active_event_code = create_event(user_email)
                 st.query_params.event = st.session_state.active_event_code
                 st.cache_data.clear()
