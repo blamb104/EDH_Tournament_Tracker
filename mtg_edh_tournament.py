@@ -90,7 +90,6 @@ def split_into_swiss_pods(players, history_df):
     elif n % 4 == 3: num_3s = 1
     pod_sizes = ([4] * ((n - (num_3s * 3)) // 4)) + ([3] * num_3s)
 
-    # Strict Swiss sorting
     available = sorted(players, key=lambda x: (scores[x], random.random()), reverse=True)
     pods = []
     for size in pod_sizes:
@@ -165,7 +164,13 @@ with st.sidebar:
                     with st.form("player_entry_form", clear_on_submit=True):
                         st.text_input("Enter Player Name", key="player_input_field")
                         st.form_submit_button("Register Player", on_click=add_player_callback)
+                    
+                    # Show the temporary list here
                     if st.session_state.registration_list:
+                        st.write("**Pending Registration:**")
+                        for p in st.session_state.registration_list:
+                            st.text(f"• {p}")
+                        
                         if st.button("Confirm Roster", type="primary"):
                             p_df = load_sheet("Players", force_refresh=True)
                             new_rows = pd.DataFrame([{"event_code": st.session_state.active_event_code, "player_name": p} for p in st.session_state.registration_list])
@@ -181,18 +186,17 @@ with st.sidebar:
                 
                 p_df = load_sheet("Players")
                 clist = p_df[p_df['event_code'] == st.session_state.active_event_code]['player_name'].tolist()
-                drop_p = st.selectbox("Drop Player", ["-- Select --"] + clist)
-                if st.button("Confirm Drop") and drop_p != "-- Select --":
-                    p_df = load_sheet("Players", force_refresh=True)
-                    updated = p_df[~((p_df['event_code'] == st.session_state.active_event_code) & (p_df['player_name'] == drop_p))]
-                    conn.update(worksheet="Players", data=updated)
-                    st.cache_data.clear(); st.rerun()
+                if clist:
+                    drop_p = st.selectbox("Drop Player", ["-- Select --"] + clist)
+                    if st.button("Confirm Drop") and drop_p != "-- Select --":
+                        p_df = load_sheet("Players", force_refresh=True)
+                        updated = p_df[~((p_df['event_code'] == st.session_state.active_event_code) & (p_df['player_name'] == drop_p))]
+                        conn.update(worksheet="Players", data=updated)
+                        st.cache_data.clear(); st.rerun()
 
-        # Sync is now Secondary
         if st.button("Sync Data", use_container_width=True, type="secondary"):
             st.cache_data.clear(); st.rerun()
         
-        # End Tournament is now Primary (Red via CSS)
         if is_admin and st.button("End Tournament", use_container_width=True, type="primary"):
             st.session_state.active_event_code = ""; st.session_state.current_pods = []; st.session_state.current_round = 1; st.cache_data.clear(); st.rerun()
 
