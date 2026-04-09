@@ -222,12 +222,25 @@ else:
     with tab2:
         if this_pods.empty:
             if is_event_admin:
-                if st.button(f"Generate Round {curr_round}", type="primary"):
-                    new_pods = split_into_swiss_pods(this_players, this_history)
-                    rows = [{"event_code": st.session_state.active_event_code, "Pod": i+1, "Player": p} for i, pod in enumerate(new_pods) for p in pod]
-                    conn.update(worksheet="CurrentPods", data=pd.concat([active_pods_df, pd.DataFrame(rows)], ignore_index=True))
-                    st.cache_data.clear(); st.rerun()
-            else: st.info(f"Waiting for Admin to post Round {curr_round}...")
+                st.subheader(f"Prepare Round {curr_round}")
+                
+                # Check for minimum player count (6 players)
+                player_count = len(this_players)
+                
+                if player_count < 6:
+                    st.warning(f"⚠️ **Cannot start tournament yet.** You only have {player_count} players. You need at least 6 players to generate a Swiss round.")
+                    if st.button("Refresh Player List"):
+                        st.cache_data.clear()
+                        st.rerun()
+                else:
+                    st.success(f"Ready to start! {player_count} players registered.")
+                    if st.button(f"Generate Round {curr_round}", use_container_width=True):
+                        new_pods = split_into_swiss_pods(this_players, this_history)
+                        rows = [{"event_code": st.session_state.active_event_code, "Pod": i+1, "Player": p} for i, pod in enumerate(new_pods) for p in pod]
+                        conn.update(worksheet="CurrentPods", data=pd.concat([active_pods_df, pd.DataFrame(rows)], ignore_index=True))
+                        st.cache_data.clear(); st.rerun()
+            else: 
+                st.info(f"Waiting for Admin to post Round {curr_round}...")
         else:
             res_rows = []; all_ready = True
             for pid in sorted(this_pods['Pod'].unique()):
