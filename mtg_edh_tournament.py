@@ -194,7 +194,7 @@ with st.sidebar:
                         conn.update(worksheet="Players", data=updated)
                         st.cache_data.clear(); st.rerun()
 
-        if st.button("Sync Data", use_container_width=True, type="secondary"):
+        if is_admin and st.button("Sync Data", use_container_width=True, type="secondary"):
             st.cache_data.clear(); st.rerun()
         
         if is_admin and st.button("End Tournament", use_container_width=True, type="primary"):
