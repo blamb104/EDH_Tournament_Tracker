@@ -18,7 +18,7 @@ if not st.user.get("is_logged_in"):
     st.info("Please log in to manage or join a tournament.")
     
     if st.button("Log in with Google"):
-            st.login()
+        st.login()
         st.stop()
 
 user_email = st.user.get("email")
