@@ -142,7 +142,7 @@ with st.sidebar:
             
             if st.session_state.registration_list:
                 st.write(f"**Pending Registration ({len(st.session_state.registration_list)})**")
-                for p in st.session_state.registration_list: st.text(f"📝 {p}")
+                for p in st.session_state.registration_list: st.text(f"{p}")
                 if st.button("Confirm & Upload Roster", type="primary", use_container_width=True):
                     p_df = load_sheet("Players", force_refresh=True)
                     new_rows = pd.DataFrame([{"event_code": st.session_state.active_event_code, "player_name": p} for p in st.session_state.registration_list])
