@@ -16,10 +16,13 @@ def load_data(sheet_name):
 if not st.user.get("is_logged_in"):
     st.title("🛡️ EDH Tournament Portal")
     st.info("Please log in to manage or join a tournament.")
-    st.button("Log in with Google", on_click=st.login)
-    st.stop()
+    
+    if st.button("Log in with Google"):
+            st.login()
+        st.stop()
 
 user_email = st.user.get("email")
+st.sidebar.success(f"Logged in as: {user_email}")
 event_code = st.sidebar.text_input("Event Code", placeholder="e.g., FNM_01")
 
 if not event_code:
