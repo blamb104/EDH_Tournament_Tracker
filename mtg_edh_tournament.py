@@ -183,7 +183,7 @@ with st.sidebar:
                     conn.update(worksheet="Players", data=updated)
                     st.cache_data.clear(); st.rerun()
 
-        if st.button("Sync Data", use_container_width=True, type="primary"):
+        if st.button("Sync Data", use_container_width=True, type="secondary"):
             st.cache_data.clear(); st.rerun()
         if is_admin and st.button("End Tournament", type="primary", use_container_width=True):
             st.session_state.active_event_code = ""; st.session_state.current_pods = []; st.session_state.current_round = 1; st.cache_data.clear(); st.rerun()
