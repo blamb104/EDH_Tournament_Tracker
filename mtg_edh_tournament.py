@@ -229,4 +229,22 @@ if st.session_state.active_event_code:
                         
                         max_p = max(pod_points.values())
                         for p, pts in pod_points.items():
-                            results
+                            results_data.append({
+                                "event_code": st.session_state.active_event_code,
+                                "Round": st.session_state.current_round,
+                                "Player": p,
+                                "Points": pts,
+                                "Result": "Winner" if pts == max_p and pts > 0 else "Participant"
+                            })
+
+            if is_admin and st.button("Finalize and Upload Results", disabled=not all_reported):
+                hist = load_sheet("MatchHistory", force_refresh=True)
+                updated_hist = pd.concat([hist, pd.DataFrame(results_data)], ignore_index=True)
+                conn.update(worksheet="MatchHistory", data=updated_hist)
+                st.session_state.current_pods = []
+                load_sheet("MatchHistory", force_refresh=True)
+                st.rerun()
+
+    with tab3:
+        st.header("Event History")
+        st.dataframe(event_history, use_container_width=True)
