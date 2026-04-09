@@ -5,25 +5,35 @@ import string
 from streamlit_gsheets import GSheetsConnection
 
 # --- 1. INITIAL SETUP & CONNECTION ---
-st.set_page_config(page_title="EDH Tournament Tracker", layout="wide")
+st.set_page_config(page_title="EDH Tournament Tracker", page_icon="🛡️", layout="wide")
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# Custom CSS for the "End Tournament" button
+# Custom CSS for Buttons and UI
 st.markdown("""
     <style>
+    /* End Tournament Button styling */
     div[data-testid="stButton"] button:has(div:contains("End Tournament")) {
         background-color: #ff4b4b;
         color: white;
         border: none;
     }
-    div[data-testid="stButton"] button:has(div:contains("End Tournament")):hover {
-        background-color: #ff3333;
-        color: white;
+    /* Main Landing Header styling */
+    .landing-header {
+        font-size: 3rem;
+        font-weight: 800;
+        text-align: center;
+        margin-bottom: 0px;
+    }
+    .landing-subtitle {
+        font-size: 1.2rem;
+        text-align: center;
+        color: #888;
+        margin-bottom: 30px;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. GLOBAL DATA LOAD (With Integer Fix & 10-min Cache) ---
+# --- 2. GLOBAL DATA LOAD ---
 @st.cache_data(ttl=600)
 def get_all_data():
     events = conn.read(worksheet="Events")
@@ -68,7 +78,6 @@ def generate_unique_code():
     return "EDH-" + "".join(random.choice(chars) for _ in range(6))
 
 def create_event(admin_email):
-    # Reload events to ensure uniqueness
     ev_refresh = conn.read(worksheet="Events", ttl=0)
     new_code = generate_unique_code()
     while new_code in ev_refresh['event_code'].values:
@@ -127,12 +136,11 @@ with st.sidebar:
     
     st.divider()
 
-    # Determine if current logged-in user is an authorized master admin
     is_master_admin = user_email in auth_df['email'].str.lower().tolist() if user_email else False
 
     if not st.session_state.active_event_code:
-        input_code = st.text_input("Enter Event Code:").upper().strip()
-        if st.button("Load Event", use_container_width=True):
+        input_code = st.text_input("Event Code Login:", placeholder="e.g. EDH-XJ49").upper().strip()
+        if st.button("Join Tournament View", use_container_width=True, type="primary"):
             active_list = events_df[events_df['status'] == 'Active']['event_code'].values
             if input_code in active_list:
                 st.session_state.active_event_code = input_code
@@ -142,7 +150,7 @@ with st.sidebar:
         
         if is_master_admin:
             st.write("---")
-            if st.button("Create New Tournament", type="primary", use_container_width=True):
+            if st.button("Create New Tournament", use_container_width=True):
                 st.session_state.active_event_code = create_event(user_email)
                 st.query_params.event = st.session_state.active_event_code
                 st.cache_data.clear()
@@ -170,34 +178,53 @@ with st.sidebar:
                         st.session_state.registration_list = []; st.cache_data.clear(); st.rerun()
             
             if st.button("End Tournament", type="primary", use_container_width=True):
-                # Reload to avoid overwriting other events
                 ev_refresh = conn.read(worksheet="Events", ttl=0)
                 ev_refresh.loc[ev_refresh['event_code'] == st.session_state.active_event_code, 'status'] = 'Inactive'
                 conn.update(worksheet="Events", data=ev_refresh)
-                
                 remaining_pods = active_pods_df[active_pods_df['event_code'] != st.session_state.active_event_code]
                 conn.update(worksheet="CurrentPods", data=remaining_pods)
-                
                 st.session_state.active_event_code = ""; st.query_params.clear(); st.cache_data.clear(); st.rerun()
         else:
             if st.button("Exit Event", use_container_width=True):
                 st.session_state.active_event_code = ""; st.query_params.clear(); st.rerun()
 
 # --- 7. MAIN UI ---
-if st.session_state.active_event_code:
+if not st.session_state.active_event_code:
+    # --- LANDING PAGE ---
+    st.markdown('<p class="landing-header">🛡️ EDH Tracker</p>', unsafe_allow_html=True)
+    st.markdown('<p class="landing-subtitle">The Ultimate Commander Tournament Companion</p>', unsafe_allow_html=True)
+    
+    # Placeholder for your Logo
+    # Replace the URL with your own custom logo URL (hosted on Imgur, GitHub, etc.)
+    logo_url = "https://cdn-icons-png.flaticon.com/512/3665/3665923.png" 
+    
+    left, mid, right = st.columns([1,2,1])
+    with mid:
+        st.image(logo_url, use_container_width=True)
+        st.info("💡 **Getting Started:** Enter an Event Code in the sidebar to view current pods and standings. Admins must log in to create or manage tournaments.")
+        
+    st.divider()
+    
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Status", "System Online")
+    c2.metric("Active Events", len(events_df[events_df['status'] == 'Active']))
+    c3.metric("Total Match History", len(history_df['event_code'].unique()) if not history_df.empty else 0)
+
+else:
+    # --- ACTIVE TOURNAMENT UI ---
     this_history = history_df[history_df['event_code'] == st.session_state.active_event_code].copy()
     this_players = players_df[players_df['event_code'] == st.session_state.active_event_code]['player_name'].tolist()
     this_pods = active_pods_df[active_pods_df['event_code'] == st.session_state.active_event_code]
     curr_round = int(this_history['Round'].max() + 1) if not this_history.empty else 1
     
-    st.title(f"🛡️ EDH Tournament: {st.session_state.active_event_code}")
+    st.title(f"⚔️ {st.session_state.active_event_code}")
     tab1, tab2, tab3 = st.tabs(["📊 Leaderboard", "⚔️ Active Pods", "📜 Match History"])
     
     with tab1:
         if not this_history.empty:
             lb = this_history.groupby('Player').agg(Points=('Points', 'sum'), Wins=('Result', lambda x: (x == 'Winner').sum())).sort_values(by=['Points', 'Wins'], ascending=False)
             st.dataframe(lb, use_container_width=True)
-        else: st.info("Waiting for Round 1.")
+        else: st.info("Waiting for Round 1 to finalize.")
 
     with tab2:
         if this_pods.empty:
@@ -228,7 +255,7 @@ if st.session_state.active_event_code:
 
     with tab3:
         if not this_history.empty:
-            for r in sorted(this_history['Round'].unique()):
+            for r in sorted(this_history['Round'].unique(), reverse=True):
                 with st.expander(f"Round {int(r)}"):
                     rd = this_history[this_history['Round'] == r]
                     for p_num in sorted(rd['Pod'].unique()):
