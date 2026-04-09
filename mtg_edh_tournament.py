@@ -228,7 +228,7 @@ if st.session_state.active_event_code:
 
     with tab3:
         if not this_history.empty:
-            for r in sorted(this_history['Round'].unique(), reverse=True):
+            for r in sorted(this_history['Round'].unique()):
                 with st.expander(f"Round {int(r)}"):
                     rd = this_history[this_history['Round'] == r]
                     for p_num in sorted(rd['Pod'].unique()):
