@@ -13,13 +13,13 @@ def load_data(sheet_name):
     return conn.read(worksheet=sheet_name, ttl="0") 
 
 # --- AUTH & EVENT LOGIC ---
-if not st.experimental_user.is_logged_in:
+if not st.user.is_logged_in:
     st.title("🛡️ EDH Tournament Portal")
     st.info("Please log in to manage or join a tournament.")
     st.button("Log in with Google", on_click=st.login)
     st.stop()
 
-user_email = st.experimental_user.email
+user_email = st.user.email
 event_code = st.sidebar.text_input("Event Code", placeholder="e.g., FNM_01")
 
 if not event_code:
