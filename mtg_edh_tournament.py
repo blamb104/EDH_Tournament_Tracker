@@ -19,7 +19,7 @@ st.markdown("""
     }
     /* Main Landing Header styling */
     .landing-header {
-        font-size: 4rem !important;
+        font-size: 3rem !important;
         font-weight: 800;
         text-align: center;
         margin-bottom: 0px;
