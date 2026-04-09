@@ -23,18 +23,26 @@ if not st.user.get("is_logged_in"):
 user_email = st.user.get("email")
 
 # --- 3. SESSION STATE ---
-if 'current_pods' not in st.session_state:
-    st.session_state.current_pods = []
-if 'active_event_code' not in st.session_state:
-    st.session_state.active_event_code = ""
-if 'current_round' not in st.session_state:
-    st.session_state.current_round = 1
-if 'draft_roster' not in st.session_state:
-    st.session_state.draft_roster = []
-if 'scoring_mode' not in st.session_state:
-    st.session_state.scoring_mode = "Casual"
+states = {
+    'current_pods': [],
+    'active_event_code': "",
+    'current_round': 1,
+    'draft_roster': [],
+    'scoring_mode': "Casual"
+}
+for key, val in states.items():
+    if key not in st.session_state:
+        st.session_state[key] = val
 
-# --- 4. HELPER FUNCTIONS ---
+# --- 4. CALLBACKS & HELPERS ---
+def add_player_callback():
+    """Ensures players are added to the list properly from the form."""
+    new_p = st.session_state.player_input_field.strip()
+    if new_p and new_p not in st.session_state.draft_roster:
+        st.session_state.draft_roster.append(new_p)
+    # Clear input field manually
+    st.session_state.player_input_field = ""
+
 def generate_unique_code():
     chars = string.ascii_uppercase + string.digits
     return "EDH-" + "".join(random.choice(chars) for _ in range(6))
@@ -53,20 +61,17 @@ def drop_player(event_code, name):
     updated = df[~((df['event_code'] == event_code) & (df['player_name'] == name))]
     conn.update(worksheet="Players", data=updated)
 
-# --- 5. DATA SYNC & INITIAL ROUND LOAD ---
-# This only runs when you first enter an event or hit "Sync"
-if st.session_state.active_event_code and len(st.session_state.current_pods) == 0:
+# --- 5. DATA PERSISTENCE & ROUND TRACKING ---
+if st.session_state.active_event_code:
     hist_df = load_sheet("MatchHistory")
     event_history = hist_df[hist_df['event_code'] == st.session_state.active_event_code]
-    if not event_history.empty:
-        # Sync the local round counter to whatever is in the sheet
-        st.session_state.current_round = int(event_history['Round'].max()) + 1
-    else:
-        st.session_state.current_round = 1
+    
+    # Only reset round from sheet if we aren't currently mid-tournament locally
+    if not event_history.empty and not st.session_state.current_pods:
+        max_r = int(event_history['Round'].max())
+        st.session_state.current_round = max_r + 1
 else:
-    # Use existing history from cache if available
-    hist_df = load_sheet("MatchHistory")
-    event_history = hist_df[hist_df['event_code'] == st.session_state.active_event_code] if st.session_state.active_event_code else pd.DataFrame()
+    event_history = pd.DataFrame()
 
 # --- 6. SIDEBAR ---
 with st.sidebar:
@@ -87,6 +92,8 @@ with st.sidebar:
                 new_code = create_event(user_email)
                 st.session_state.active_event_code = new_code
                 st.rerun()
+        else:
+            st.warning("Host access required.")
         input_code = st.text_input("Enter Event Code:").upper().strip()
         if input_code:
             events_df = load_sheet("Events")
@@ -94,22 +101,36 @@ with st.sidebar:
                 st.session_state.active_event_code = input_code
                 st.rerun()
     else:
+        # --- ACTIVE EVENT SIDEBAR ---
         events_df = load_sheet("Events")
         event_row = events_df[events_df['event_code'] == st.session_state.active_event_code].iloc[0]
         is_admin = (event_row['admin_email'] == user_email)
-        st.subheader(f"Event: {st.session_state.active_event_code}")
         
+        st.subheader(f"Event: {st.session_state.active_event_code}")
         has_started = not event_history.empty or len(st.session_state.current_pods) > 0
+        
         if not has_started:
             st.caption("Status: Registration Open")
             if is_admin:
-                st.session_state.scoring_mode = st.radio("Scoring System", ["Casual", "Competitive"])
+                # SCORING WITH INFO BOXES (TOOLTIPS)
+                st.session_state.scoring_mode = st.radio(
+                    "Scoring System", ["Casual", "Competitive"],
+                    help="**Casual**: 3 pts for a win, 1 pt for playing.\n\n**Competitive**: Manual entry. Defaults to 5 pts (1st), 3 pts (2nd), 2 pts (3rd), 1 pt (4th)."
+                )
+                
+                st.write("### Add Players")
                 with st.form("add_player_form", clear_on_submit=True):
-                    new_p = st.text_input("Draft Player")
-                    if st.form_submit_button("Add to List") and new_p:
-                        if new_p not in st.session_state.draft_roster:
-                            st.session_state.draft_roster.append(new_p)
-                            st.rerun()
+                    st.text_input("Player Name", key="player_input_field")
+                    st.form_submit_button("Add to List", on_click=add_player_callback)
+                
+                # VISIBLE PREVIEW LIST
+                if st.session_state.draft_roster:
+                    st.write(f"**Drafting ({len(st.session_state.draft_roster)})**")
+                    for p in st.session_state.draft_roster:
+                        st.text(f"• {p}")
+                    if st.button("Clear Draft"):
+                        st.session_state.draft_roster = []
+                        st.rerun()
         else:
             st.caption(f"Status: Round {st.session_state.current_round} ({st.session_state.scoring_mode})")
             if is_admin:
@@ -119,11 +140,16 @@ with st.sidebar:
                         p_df = load_sheet("Players", force_refresh=True)
                         conn.update(worksheet="Players", data=pd.concat([p_df, pd.DataFrame([{"event_code": st.session_state.active_event_code, "player_name": late_p}])], ignore_index=True))
                         st.rerun()
+                    p_df = load_sheet("Players")
+                    roster = p_df[p_df['event_code'] == st.session_state.active_event_code]['player_name'].tolist()
+                    p_to_drop = st.selectbox("Drop Player", ["--"] + roster)
+                    if st.button("Drop Selected Player") and p_to_drop != "--":
+                        drop_player(st.session_state.active_event_code, p_to_drop)
+                        st.rerun()
 
         st.divider()
         if st.button("Sync Data", use_container_width=True):
             st.cache_data.clear()
-            st.session_state.current_pods = [] # Force a re-fetch of round state
             st.rerun()
         if is_admin and st.button("End Tournament", type="secondary", use_container_width=True):
             st.session_state.active_event_code = ""; st.session_state.current_pods = []; st.session_state.draft_roster = []; st.rerun()
@@ -142,19 +168,26 @@ if st.session_state.active_event_code:
     with tab2:
         p_df = load_sheet("Players")
         existing = p_df[p_df['event_code'] == st.session_state.active_event_code]['player_name'].tolist()
+        # Combine local draft with sheet data
         full_roster = list(set(existing + st.session_state.draft_roster))
 
         if not st.session_state.current_pods:
             st.subheader(f"Prepare Round {st.session_state.current_round}")
+            st.write(f"Confirmed Players: {len(full_roster)}")
+            
             if is_admin and len(full_roster) >= 4:
                 if st.button(f"Generate Round {st.session_state.current_round}", type="primary"):
+                    # Push draft to sheet only when round starts
                     if st.session_state.draft_roster:
                         new_rows = pd.DataFrame([{"event_code": st.session_state.active_event_code, "player_name": p} for p in st.session_state.draft_roster])
                         conn.update(worksheet="Players", data=pd.concat([p_df, new_rows], ignore_index=True))
                         st.session_state.draft_roster = []
+                    
                     random.shuffle(full_roster)
                     st.session_state.current_pods = [full_roster[i:i+4] for i in range(0, len(full_roster), 4)]
                     st.rerun()
+            elif len(full_roster) < 4:
+                st.warning("Need at least 4 players to generate pods.")
         else:
             st.subheader(f"Reporting Round {st.session_state.current_round}")
             results_data = []
@@ -178,11 +211,9 @@ if st.session_state.active_event_code:
             if is_admin and st.button("Finalize and Upload Results", disabled=not all_reported):
                 hist = load_sheet("MatchHistory", force_refresh=True)
                 conn.update(worksheet="MatchHistory", data=pd.concat([hist, pd.DataFrame(results_data)], ignore_index=True))
-                
-                # --- LOCAL TRACKING UPDATES ---
-                st.session_state.current_pods = [] # Clear pods locally
-                st.session_state.current_round += 1 # Increment round locally
-                st.cache_data.clear() # Refresh leaderboard data
+                st.session_state.current_pods = []
+                st.session_state.current_round += 1
+                st.cache_data.clear() 
                 st.rerun()
 
     with tab3:
