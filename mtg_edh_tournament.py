@@ -4,7 +4,7 @@ import random
 import string
 from streamlit_gsheets import GSheetsConnection
 
-# --- 1. INITIAL SETUP & CONNECTION ---
+# --- INITIAL SETUP & CONNECTION ---
 st.set_page_config(page_title="EDH Tournament Tracker", page_icon="🛡️", layout="wide")
 conn = st.connection("gsheets", type=GSheetsConnection)
 
@@ -33,7 +33,19 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. GLOBAL DATA LOAD ---
+# --- DROP CONFIRMATION DIALOG ---
+@st.dialog("Confirm Player Removal")
+def confirm_drop(player_name):
+    st.warning(f"Are you sure you want to remove **{player_name}**? This cannot be undone and will remove them from the tournament roster.")
+    if st.button(f"Yes, Drop {player_name}", type="primary", use_container_width=True):
+        # Filter out the player
+        updated_df = players_df[~((players_df['event_code'] == st.session_state.active_event_code) & 
+                                  (players_df['player_name'] == player_name))]
+        conn.update(worksheet="Players", data=updated_df)
+        st.cache_data.clear()
+        st.rerun()
+
+# --- GLOBAL DATA LOAD ---
 @st.cache_data(ttl=600)
 def get_all_data():
     events = conn.read(worksheet="Events")
@@ -53,7 +65,7 @@ def get_all_data():
 
 events_df, players_df, history_df, active_pods_df, auth_df = get_all_data()
 
-# --- 3. URL & REDIRECT LOGIC ---
+# --- URL & REDIRECT LOGIC ---
 query_params = st.query_params
 if "event" in query_params and "active_event_code" not in st.session_state:
     st.session_state.active_event_code = query_params["event"]
@@ -66,13 +78,13 @@ if "active_event_code" in st.session_state and st.session_state.active_event_cod
         st.cache_data.clear()
         st.rerun()
 
-# --- 4. SESSION STATE DEFAULTS ---
+# --- SESSION STATE DEFAULTS ---
 if 'active_event_code' not in st.session_state: st.session_state.active_event_code = ""
 if 'registration_list' not in st.session_state: st.session_state.registration_list = []
 
 user_email = st.user.get("email").lower() if st.user.get("is_logged_in") else None
 
-# --- 5. HELPERS ---
+# --- HELPERS ---
 def generate_unique_code():
     chars = string.ascii_uppercase + string.digits
     return "EDH-" + "".join(random.choice(chars) for _ in range(6))
@@ -122,7 +134,7 @@ def split_into_swiss_pods(players, history_df):
         pods.append(current_pod)
     return pods
 
-# --- 6. SIDEBAR ---
+# --- SIDEBAR ---
 with st.sidebar:
     st.title("Event Settings")
     if st.user.get("is_logged_in"):
@@ -166,16 +178,44 @@ with st.sidebar:
         if is_event_admin:
             st.success("Admin Access")
             with st.expander("Add/Remove Players"):
+                # Current Active Players Section
+                st.subheader("Current Roster")
+                active_player_names = players_df[players_df['event_code'] == st.session_state.active_event_code]['player_name'].tolist()
+    
+                if not active_player_names:
+                    st.info("No players registered yet.")
+                else:
+                    for p in active_player_names:
+                        col1, col2 = st.columns([0.85, 0.15])
+                        col1.text(f"👤 {p}")
+                 # The "X" icon button
+                        if col2.button("✖️", key=f"drop_{p}", help=f"Drop {p} from tournament"):
+                            confirm_drop(p)
+    
+                st.divider()
+
+                # Add New Players Section
+                st.subheader("Add New Players")
                 with st.form("add_player", clear_on_submit=True):
                     name_in = st.text_input("Player Name")
-                    if st.form_submit_button("Add"):
-                        if name_in: st.session_state.registration_list.append(name_in.strip())
+                    if st.form_submit_button("Queue Player"):
+                        if name_in and name_in not in active_player_names: 
+                            st.session_state.registration_list.append(name_in.strip())
+                        elif name_in in active_player_names:
+                            st.error("Player already in roster.")
+
+                # Pending List
                 if st.session_state.registration_list:
-                    for p in st.session_state.registration_list: st.text(f"• {p}")
-                    if st.button("Save Player List"):
+                    st.write("**Pending to be added:**")
+                    for p in st.session_state.registration_list: 
+                        st.text(f"• {p}")
+        
+                    if st.button("Save Pending List", type="primary", use_container_width=True):
                         new_reg = pd.DataFrame([{"event_code": st.session_state.active_event_code, "player_name": p} for p in st.session_state.registration_list])
                         conn.update(worksheet="Players", data=pd.concat([players_df, new_reg], ignore_index=True))
-                        st.session_state.registration_list = []; st.cache_data.clear(); st.rerun()
+                        st.session_state.registration_list = []
+                        st.cache_data.clear()
+                        st.rerun()
             
             if st.button("End Tournament", type="primary", use_container_width=True):
                 ev_refresh = conn.read(worksheet="Events", ttl=0)
@@ -188,7 +228,7 @@ with st.sidebar:
             if st.button("Exit Event", use_container_width=True):
                 st.session_state.active_event_code = ""; st.query_params.clear(); st.rerun()
 
-# --- 7. MAIN UI ---
+# --- MAIN UI ---
 if not st.session_state.active_event_code:
     # --- LANDING PAGE ---
     st.markdown('<p class="landing-header">🛡️ EDH Tournament Tracker</p>', unsafe_allow_html=True)
