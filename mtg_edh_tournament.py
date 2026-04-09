@@ -103,7 +103,7 @@ with st.sidebar:
                         st.rerun()
         else:
             # EVENT MANAGER MODE
-            st.caption("Status: Round {st.session_state.current_round} in Progress")
+            st.caption(f"Status: Round {st.session_state.current_round} in Progress")
             if is_admin:
                 st.write("---")
                 st.subheader("Drop Players")
