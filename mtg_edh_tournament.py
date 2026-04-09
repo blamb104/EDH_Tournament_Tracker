@@ -189,7 +189,7 @@ with st.sidebar:
                         col1, col2 = st.columns([0.85, 0.15])
                         col1.text(f"👤 {p}")
                  # The "X" icon button
-                        if col2.button("✖️"):
+                        if col2.button("✖️", key=f"drop_{p}"):
                             confirm_drop(p)
     
                 st.divider()
