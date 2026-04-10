@@ -26,9 +26,6 @@ st.markdown("""
         color: #FFFFFF; text-shadow: 0px 0px 20px rgba(255,255,255,0.5);
         line-height: 1; margin-bottom: 0px; white-space: nowrap;
     }
-    .landing-subtitle {
-        font-size: 2rem; text-align: center; color: #AAAAAA; margin-top: -10px;
-    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -204,12 +201,12 @@ else:
         if not this_history.empty:
             lb = this_history.groupby('Player').agg(Points=('Points', 'sum'), Wins=('Result', lambda x: (x == 'Winner').sum())).sort_values(by=['Points', 'Wins'], ascending=False)
             st.dataframe(lb, use_container_width=True)
-        else: st.info("Waiting for Round 1 results.")
+        else: st.info("Standings will appear here after Round 1 in finalized.")
 
     with tab2:
         if this_pods.empty:
             if is_event_admin:
-                if len(this_players) < 6: st.warning(f"⚠️ Need 6 players (You have {len(this_players)})")
+                if len(this_players) < 6: st.warning(f"⚠️ You need at least 6 players to start the tournament. (Current Player Count: {len(this_players)})")
                 elif st.button(f"Generate Round {curr_round}", type="primary"):
                     new_pods = split_into_swiss_pods(this_players, this_history)
                     rows = [{"event_code": st.session_state.active_event_code, "Pod": i+1, "Player": p} for i, pod in enumerate(new_pods) for p in pod]
