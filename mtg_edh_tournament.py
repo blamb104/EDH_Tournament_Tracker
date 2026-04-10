@@ -197,7 +197,7 @@ else:
     curr_round = int(this_history['Round'].max() + 1) if not this_history.empty else 1
     event_mode = events_df[events_df['event_code'] == st.session_state.active_event_code]['mode'].values[0]
 
-    st.title(f"⚔️ {st.session_state.active_event_code} ({event_mode})")
+    st.title(f"Event Code: {st.session_state.active_event_code} ({event_mode})")
     tab1, tab2, tab3 = st.tabs(["🏆 Leaderboard", "⚔️ Active Pods", "📜 History"])
     
     with tab1:
