@@ -166,7 +166,6 @@ with st.sidebar:
                     if st.form_submit_button("Add"):
                         if name_in and name_in not in active_names: st.session_state.registration_list.append(name_in.strip())
                 if st.session_state.registration_list:
-                    st.write("---")
                     st.subheader("Pending Players")
                     for p in st.session_state.registration_list:
                         st.text(f"{p}")
