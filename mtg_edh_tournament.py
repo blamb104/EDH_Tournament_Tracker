@@ -140,11 +140,12 @@ with st.sidebar:
         if st.button("Join Tournament", use_container_width=True, type="primary"):
             if input_code in events_df[events_df['status'] == 'Active']['event_code'].values:
                 st.session_state.active_event_code = input_code; st.query_params.event = input_code; st.rerun()
-            else: st.error("Code not found or Inactive.")
+            else: st.error("Code not found.")
         
         if is_master_admin:
             st.write("---")
             new_mode = st.radio("Tournament Mode", ["Casual", "Competitive"])
+            st.help("In Casual Mode the winner of each game will recieve 3 points and the other participants will each receive 1 point. In Competitve Mode the points for each round will need to be manually entered by the Tournament Admin.")
             if st.button("Create New Tournament", use_container_width=True):
                 st.session_state.active_event_code = create_event(user_email, new_mode)
                 st.query_params.event = st.session_state.active_event_code; st.cache_data.clear(); st.rerun()
