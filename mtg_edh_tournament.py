@@ -22,7 +22,7 @@ st.markdown("""
     }
     /* Landing Header styling */
     .landing-header {
-        font-size: 8rem !important; font-weight: 900; text-align: center;
+        font-size: 3rem !important; font-weight: 900; text-align: center;
         color: #FFFFFF; text-shadow: 0px 0px 20px rgba(255,255,255,0.5);
         line-height: 1; margin-bottom: 0px; white-space: nowrap;
     }
@@ -123,7 +123,7 @@ def split_into_swiss_pods(players, history_df):
 
 # --- 6. SIDEBAR ---
 with st.sidebar:
-    st.title("🛡️ Settings")
+    st.title("Event Settings")
     if st.user.get("is_logged_in"):
         cols = st.columns([1, 3])
         cols[0].image(st.user.get("picture", "https://cdn-icons-png.flaticon.com/512/149/149071.png"), width=40)
@@ -154,10 +154,10 @@ with st.sidebar:
         st.subheader(f"Code: {st.session_state.active_event_code}")
         st.caption(f"Mode: {event_row['mode']}")
         
-        if st.button("Refresh Data 🔄", use_container_width=True): st.cache_data.clear(); st.rerun()
+        if st.button("Refresh Data", use_container_width=True): st.cache_data.clear(); st.rerun()
 
         if is_event_admin:
-            with st.expander("👥 Manage Roster"):
+            with st.expander("Manage Player Roster"):
                 active_names = players_df[players_df['event_code'] == st.session_state.active_event_code]['player_name'].tolist()
                 for p in active_names:
                     c = st.columns([0.1, 0.75, 0.15])
@@ -186,9 +186,8 @@ with st.sidebar:
 
 # --- 7. MAIN UI ---
 if not st.session_state.active_event_code:
-    st.markdown('<p class="landing-header">🛡️ EDH Tracker 🏆</p>', unsafe_allow_html=True)
-    st.markdown('<p class="landing-subtitle">The Ultimate Commander Tournament Companion</p>', unsafe_allow_html=True)
-    logo_url = "https://raw.githubusercontent.com/YourUser/YourRepo/main/logo.png" # UPDATE THIS URL
+    st.markdown('<p class="landing-header">🛡️ EDH Tournament Tracker 🛡️</p>', unsafe_allow_html=True)
+    logo_url = "https://lh3.googleusercontent.com/d/1SUjz7NARD2glitJ-vwhsouepr0iJLPoZ" # UPDATE THIS URL
     l, m, r = st.columns([1,2,1]); m.image(logo_url, use_container_width=True)
     st.divider()
     c1, c2, c3 = st.columns(3)
