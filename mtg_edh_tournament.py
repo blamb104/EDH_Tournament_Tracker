@@ -190,9 +190,6 @@ if not st.session_state.active_event_code:
     logo_url = "https://lh3.googleusercontent.com/d/1SUjz7NARD2glitJ-vwhsouepr0iJLPoZ" # UPDATE THIS URL
     l, m, r = st.columns([1,2,1]); m.image(logo_url, use_container_width=True)
     st.divider()
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Status", "Online"); c2.metric("Active Events", len(events_df[events_df['status'] == 'Active']))
-    c3.metric("Total History", len(history_df['event_code'].unique()) if not history_df.empty else 0)
 else:
     this_history = history_df[history_df['event_code'] == st.session_state.active_event_code].copy()
     this_players = players_df[players_df['event_code'] == st.session_state.active_event_code]['player_name'].tolist()
