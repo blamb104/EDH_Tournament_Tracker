@@ -154,7 +154,7 @@ with st.sidebar:
         if st.button("Refresh Data", use_container_width=True): st.cache_data.clear(); st.rerun()
         st.divider()
         if is_event_admin:
-            st.subheader("Manage Players"):
+            st.subheader("Manage Players")
                 active_names = players_df[players_df['event_code'] == st.session_state.active_event_code]['player_name'].tolist()
                 for p in active_names:
                     c = st.columns([0.1, 0.75, 0.15])
