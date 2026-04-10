@@ -152,7 +152,6 @@ with st.sidebar:
         st.caption(f"Mode: {event_row['mode']}")
         
         if st.button("Refresh Data", use_container_width=True): st.cache_data.clear(); st.rerun()
-        st.divider()
         if is_event_admin:
             with st.expander("Manage Players"):
                 active_names = players_df[players_df['event_code'] == st.session_state.active_event_code]['player_name'].tolist()
@@ -164,10 +163,14 @@ with st.sidebar:
                 st.divider()
                 with st.form("add_p", clear_on_submit=True):
                     name_in = st.text_input("New Player")
-                    if st.form_submit_button("Queue"):
+                    if st.form_submit_button("Add"):
                         if name_in and name_in not in active_names: st.session_state.registration_list.append(name_in.strip())
                 if st.session_state.registration_list:
-                    if st.button("Save Pending List", type="primary", use_container_width=True):
+                    st.write("---")
+                    st.subheader("Pending Players")
+                    for p in st.session_state.registration_list:
+                        st.text(f"{p}")
+                    if st.button("Add Pending Players to Event", type="primary", use_container_width=True):
                         new_reg = pd.DataFrame([{"event_code": st.session_state.active_event_code, "player_name": p} for p in st.session_state.registration_list])
                         conn.update(worksheet="Players", data=pd.concat([players_df, new_reg], ignore_index=True))
                         st.session_state.registration_list = []; st.cache_data.clear(); st.rerun()
