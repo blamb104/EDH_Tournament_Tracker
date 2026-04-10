@@ -234,7 +234,7 @@ else:
                                     res_rows.append({"event_code": st.session_state.active_event_code, "Round": curr_round, "Pod": pid, "Player": p, "Points": 3 if p == win else 1, "Result": "Winner" if p == win else "Participant"})
                     else:
                         for p in mems: st.write(f"• {p}")
-            if is_event_admin and st.button("Finalize Round", disabled=not all_ready, type="primary", use_container_width=True):
+            if is_event_admin and st.button("Finalize Round", disabled=not all_ready, type="primary"):
                 conn.update(worksheet="MatchHistory", data=pd.concat([history_df, pd.DataFrame(res_rows)], ignore_index=True))
                 conn.update(worksheet="CurrentPods", data=active_pods_df[active_pods_df['event_code'] != st.session_state.active_event_code])
                 st.cache_data.clear(); st.rerun()
